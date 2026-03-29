@@ -278,7 +278,7 @@ def main(args: Optional[List[str]] = None) -> None:
         args = sys.argv[1:]
 
     if len(args) != 1:
-        print("Usage: python -m qviz.bloch_sphere <input_file.txt>")
+        print("Usage: python -m quantumviz.bloch_sphere <input_file.txt>")
         sys.exit(1)
 
     input_file = args[0]

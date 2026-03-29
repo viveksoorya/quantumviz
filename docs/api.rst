@@ -4,7 +4,7 @@ API Reference
 Bloch Sphere
 ------------
 
-.. automodule:: qviz.bloch_sphere
+.. automodule:: quantumviz.bloch_sphere
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,7 +12,7 @@ Bloch Sphere
 State City
 ----------
 
-.. automodule:: qviz.state_city
+.. automodule:: quantumviz.state_city
    :members:
    :undoc-members:
    :show-inheritance:
@@ -20,7 +20,7 @@ State City
 Cost Landscape
 --------------
 
-.. automodule:: qviz.cost_landscape
+.. automodule:: quantumviz.cost_landscape
    :members:
    :undoc-members:
    :show-inheritance:
@@ -28,7 +28,7 @@ Cost Landscape
 Circuit Diagram
 ---------------
 
-.. automodule:: qviz.circuit_diagram
+.. automodule:: quantumviz.circuit_diagram
    :members:
    :undoc-members:
    :show-inheritance:
@@ -36,7 +36,7 @@ Circuit Diagram
 Dynamic Flow
 ------------
 
-.. automodule:: qviz.dynamic_flow
+.. automodule:: quantumviz.dynamic_flow
    :members:
    :undoc-members:
    :show-inheritance:
@@ -44,7 +44,7 @@ Dynamic Flow
 CLI
 ---
 
-.. automodule:: qviz.cli
+.. automodule:: quantumviz.cli
    :members:
    :undoc-members:
    :show-inheritance:
@@ -52,7 +52,7 @@ CLI
 Dashboard
 ---------
 
-.. automodule:: qviz.dashboard.main
+.. automodule:: quantumviz.dashboard.main
    :members:
    :undoc-members:
    :show-inheritance:

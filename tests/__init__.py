@@ -1,3 +1,3 @@
 """
-Test suite for qviz package.
+Test suite for quantumviz package.
 """

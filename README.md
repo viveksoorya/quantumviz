@@ -46,11 +46,11 @@ quantumviz state-city input.json -o output/
 # Plot circuit diagram
 quantumviz circuit circuit.json -o circuit.png
 
-# Plot QAOA cost landscape
-quantumviz cost-landscape qaoa -o landscape.png
+# Plot QAOA cost landscape (requires input file)
+quantumviz cost-landscape qaoa graph.json -o landscape.png
 
-# Plot VQE energy landscape
-quantumviz cost-landscape vqe -o energy.png
+# Plot VQE energy landscape (requires input file)
+quantumviz cost-landscape vqe hamiltonian.json -o energy.png
 
 # Start dashboard
 quantumviz serve
@@ -91,6 +91,44 @@ theta=60 deg, phi=45   # Bloch angles
   ]
 }
 ```
+
+### QAOA Cost Landscape (JSON)
+
+Defines a MaxCut problem via graph edges.
+
+```json
+{
+  "edges": [[0, 1], [1, 2], [0, 2]]
+}
+```
+
+Each edge `[u, v]` represents a connection between qubits `u` and `v` (0-indexed).
+
+### VQE Energy Landscape (JSON)
+
+Defines a molecular Hamiltonian as a sum of Pauli terms.
+
+```json
+{
+  "terms": [
+    {"coeff": -1.0, "paulis": []},
+    {"coeff": 0.5, "paulis": ["Z"]},
+    {"coeff": 0.25, "paulis": ["Z", "Z"]}
+  ]
+}
+```
+
+Each term has:
+- `coeff`: Real number coefficient
+- `paulis`: List of Pauli operators (`I`, `X`, `Y`, `Z`) - one per qubit
+
+### Example Files
+
+See the `examples/` directory for complete input file examples:
+- `examples/qaoa_maxcut_2qubit.json` - Simple 2-qubit graph
+- `examples/qaoa_maxcut_triangle.json` - Triangle graph
+- `examples/vqe_h2.json` - H2 molecule Hamiltonian
+- `examples/vqe_lih.json` - LiH molecule Hamiltonian
 
 ## Development
 

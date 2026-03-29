@@ -1,0 +1,9 @@
+{
+  "_comment": "QAOA MaxCut example for a triangle graph: 0 -- 1 -- 2 -- 0",
+  "_description": "A fully connected triangle of 3 qubits. More edges means a more complex optimization landscape.",
+  "edges": [
+    [0, 1],
+    [1, 2],
+    [0, 2]
+  ]
+}

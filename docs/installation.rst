@@ -6,29 +6,29 @@ Core Package
 
 .. code-block:: bash
 
-   pip install qviz
+   pip install quantumviz
 
 With Dashboard (Web Interface)
 -------------------------------
 
 .. code-block:: bash
 
-   pip install qviz[dashboard]
+   pip install quantumviz[dashboard]
 
 With Quantum Hardware Support
 -----------------------------
 
 .. code-block:: bash
 
-   pip install qviz[all]
+   pip install quantumviz[all]
 
 Development Install
 -------------------
 
 .. code-block:: bash
 
-   git clone https://github.com/yourusername/qviz.git
-   cd qviz
+   git clone https://github.com/yourusername/quantumviz.git
+   cd quantumviz
    pip install -e ".[dev,all]"
 
 Requirements

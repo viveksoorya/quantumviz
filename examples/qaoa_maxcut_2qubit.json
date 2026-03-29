@@ -1,0 +1,7 @@
+{
+  "_comment": "QAOA MaxCut example for a 2-qubit line graph: 0 -- 1",
+  "_description": "Each edge represents a connection between two qubits. The goal is to partition vertices to maximize cut edges.",
+  "edges": [
+    [0, 1]
+  ]
+}

@@ -1,5 +1,5 @@
 """
-Pytest configuration and shared fixtures for qviz tests.
+Pytest configuration and shared fixtures for quantumviz tests.
 """
 
 import pytest

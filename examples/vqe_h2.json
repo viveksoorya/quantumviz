@@ -1,0 +1,9 @@
+{
+  "_comment": "VQE Hamiltonian for H2 (hydrogen molecule)",
+  "_description": "Terms are Pauli string representations. Empty paulis list means identity (coefficient only).",
+  "terms": [
+    {"coeff": -1.0, "paulis": []},
+    {"coeff": 0.5, "paulis": ["Z"]},
+    {"coeff": 0.2, "paulis": ["Z", "Z"]}
+  ]
+}

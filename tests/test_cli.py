@@ -1,5 +1,5 @@
 """
-Comprehensive tests for the qviz CLI.
+Comprehensive tests for the quantumviz CLI.
 """
 
 import pytest
@@ -20,7 +20,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(main, ['--help'])
         assert result.exit_code == 0
-        assert 'qviz' in result.output
+        assert 'quantumviz' in result.output
 
     def test_main_version(self):
         """Test version output."""
@@ -110,19 +110,27 @@ class TestCostLandscapeCLI:
 
     def test_cost_landscape_qaoa(self):
         """Test cost-landscape qaoa."""
+        data = {"edges": [[0, 1], [1, 2]]}
         with tempfile.TemporaryDirectory() as tmpdir:
+            input_file = os.path.join(tmpdir, "qaoa.json")
+            with open(input_file, 'w') as f:
+                json.dump(data, f)
             output_file = os.path.join(tmpdir, "qaoa.png")
             runner = CliRunner()
-            result = runner.invoke(cost_landscape, ['qaoa', '-o', output_file])
+            result = runner.invoke(cost_landscape, ['qaoa', input_file, '-o', output_file])
             assert result.exit_code == 0
             assert os.path.exists(output_file)
 
     def test_cost_landscape_vqe(self):
         """Test cost-landscape vqe."""
+        data = {"terms": [{"coeff": 0.5, "paulis": ["Z"]}]}
         with tempfile.TemporaryDirectory() as tmpdir:
+            input_file = os.path.join(tmpdir, "vqe.json")
+            with open(input_file, 'w') as f:
+                json.dump(data, f)
             output_file = os.path.join(tmpdir, "vqe.png")
             runner = CliRunner()
-            result = runner.invoke(cost_landscape, ['vqe', '-o', output_file])
+            result = runner.invoke(cost_landscape, ['vqe', input_file, '-o', output_file])
             assert result.exit_code == 0
             assert os.path.exists(output_file)
 

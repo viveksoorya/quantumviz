@@ -1,0 +1,11 @@
+{
+  "_comment": "VQE Hamiltonian for LiH (lithium hydride)",
+  "_description": "Larger molecule with more Hamiltonian terms. Supported paulis: I, X, Y, Z",
+  "terms": [
+    {"coeff": -7.8, "paulis": []},
+    {"coeff": 0.3, "paulis": ["Z"]},
+    {"coeff": 0.15, "paulis": ["Z", "Z"]},
+    {"coeff": 0.1, "paulis": ["X"]},
+    {"coeff": 0.05, "paulis": ["Y", "Z"]}
+  ]
+}

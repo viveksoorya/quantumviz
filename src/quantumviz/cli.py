@@ -12,6 +12,9 @@ from quantumviz.state_city import plot_state_cities_from_file as _plot_state_cit
 from quantumviz.cost_landscape import (
     plot_qaoa_landscape as _plot_qaoa,
     plot_vqe_landscape as _plot_vqe,
+    validate_qaoa_input,
+    validate_vqe_input,
+    get_examples_dir,
 )
 from quantumviz.circuit_diagram import plot_circuit as _draw_circuit
 from quantumviz.dynamic_flow import plot_dynamic_flow as _plot_dynamic_flow
@@ -49,17 +52,49 @@ def state_city(input_file, output_dir, dpi):
 
 @main.command()
 @click.argument("algorithm", type=click.Choice(["qaoa", "vqe"]))
+@click.argument("input_file", type=click.Path(exists=True))
 @click.option("-o", "--output", "output_file", help="Output file path")
 @click.option("--dpi", default=150, help="DPI for saved figure")
-def cost_landscape(algorithm, output_file, dpi):
-    """Plot QAOA or VQE cost landscape."""
+def cost_landscape(algorithm, input_file, output_file, dpi):
+    """Plot QAOA or VQE cost landscape from input file.
+
+    QAOA format:     {"edges": [[0, 1], [1, 2], ...]}
+    VQE format:      {"terms": [{"coeff": 0.5, "paulis": ["Z"]}, ...]}
+
+    See examples in: quantumviz/examples/
+    """
+    import json
+
+    try:
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        click.echo(f"Error: Invalid JSON in {input_file}: {e}", err=True)
+        sys.exit(1)
+
+    if not isinstance(data, dict):
+        click.echo(f"Error: Input must be a JSON object, got {type(data).__name__}.", err=True)
+        sys.exit(1)
+
     if output_file is None:
-        output_file = f"{algorithm}_cost_landscape.png"
+        output_file = input_file.replace('.json', f'_{algorithm}.png')
 
     if algorithm == "qaoa":
-        _plot_qaoa(output_path=output_file, dpi=dpi)
+        try:
+            edges = validate_qaoa_input(data)
+        except ValueError as e:
+            click.echo(f"Error: {e}", err=True)
+            click.echo(f"\nSee example files: {get_examples_dir()}/")
+            sys.exit(1)
+        _plot_qaoa(edges, output_path=output_file, dpi=dpi)
     else:
-        _plot_vqe(output_path=output_file, dpi=dpi)
+        try:
+            terms = validate_vqe_input(data)
+        except ValueError as e:
+            click.echo(f"Error: {e}", err=True)
+            click.echo(f"\nSee example files: {get_examples_dir()}/")
+            sys.exit(1)
+        _plot_vqe(terms, output_path=output_file, dpi=dpi)
 
     click.echo(f"Saved: {output_file}")
 

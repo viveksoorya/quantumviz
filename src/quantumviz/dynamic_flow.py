@@ -271,7 +271,7 @@ def main(args: Optional[List[str]] = None) -> None:
         args = sys.argv[1:]
 
     if len(args) != 1:
-        print("Usage: python -m qviz.dynamic_flow <input_json>")
+        print("Usage: python -m quantumviz.dynamic_flow <input_json>")
         sys.exit(1)
 
     input_file = args[0]

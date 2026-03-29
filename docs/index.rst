@@ -1,4 +1,4 @@
-Welcome to qviz's documentation!
+Welcome to quantumviz's documentation!
 =====================================
 
 .. toctree::
@@ -14,8 +14,8 @@ Quick Start
 
 .. code-block:: bash
 
-   pip install qviz
-   qviz bloch-sphere input.txt -o output.png
+   pip install quantumviz
+   quantumviz bloch-sphere input.txt -o output.png
 
 Features
 --------

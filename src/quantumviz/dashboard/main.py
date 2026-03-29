@@ -1,5 +1,5 @@
 """
-qviz Dashboard - FastAPI web interface for quantum visualizations.
+quantumviz Dashboard - FastAPI web interface for quantum visualizations.
 
 This module provides a web-based dashboard for visualizing quantum algorithm
 states and running circuits on quantum hardware.

@@ -1,5 +1,5 @@
 """
-Sphinx documentation configuration for qviz.
+Sphinx documentation configuration for quantumviz.
 """
 
 import os
@@ -9,7 +9,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-project = "qviz"
+project = "quantumviz"
 copyright = "2024"
 author = "Your Name"
 version = "0.1.0"
