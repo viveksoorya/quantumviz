@@ -16,6 +16,6 @@ jobs:
           python-version: "3.x"
       - run: pip install build
       - run: python -m build
-      - uses: pypa/gh-action-pypi-publish@release
+      - uses: pypa/gh-action-pypi-publish@main
         with:
           repository-url: https://test.pypi.org/legacy/
