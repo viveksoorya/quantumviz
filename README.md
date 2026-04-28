@@ -135,7 +135,7 @@ See the `examples/` directory for complete input file examples:
 ### Install for Development
 
 ```bash
-git clone https://github.com/yourusername/quantumviz.git
+git clone https://github.com/viveksoorya/quantumviz.git
 cd quantumviz
 pip install -e ".[dev,all]"
 ```
