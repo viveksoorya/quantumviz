@@ -242,8 +242,8 @@ def plot_qaoa_landscape(
     Returns:
         matplotlib Figure object if output_path is None, else None
     """
-    gammas = np.linspace(gamma_range[0], gamma_range[1], resolution)
-    betas = np.linspace(beta_range[0], beta_range[1], resolution)
+    gammas = np.linspace(float(gamma_range[0]), float(gamma_range[1]), resolution)
+    betas = np.linspace(float(beta_range[0]), float(beta_range[1]), resolution)
     G, B = np.meshgrid(gammas, betas)
     Z = qaoa_cost(G, B, edges)
 
@@ -283,7 +283,7 @@ def plot_vqe_landscape(
     Returns:
         matplotlib Figure object if output_path is None, else None
     """
-    thetas = np.linspace(theta_range[0], theta_range[1], resolution)
+    thetas = np.linspace(float(theta_range[0]), float(theta_range[1]), resolution)
     energies = vqe_energy(thetas, terms)
 
     plt.figure(figsize=(10, 6))
