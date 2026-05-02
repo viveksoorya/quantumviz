@@ -101,6 +101,31 @@ plot_dcn("input.json", "output.png")
 rho = state_to_density([1/np.sqrt(2), 1/np.sqrt(2)])
 ```
 
+### Using with Qiskit
+
+quantumviz accepts Qiskit objects directly, complementing Qiskit's built-in visualizations:
+
+```python
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import Statevector
+from quantumviz import plot_bloch_sphere, plot_dcn, plot_state_city, plot_circuit
+
+# Create circuit with Qiskit
+qc = QuantumCircuit(2)
+qc.h(0); qc.cx(0, 1)
+
+# quantumviz's unique visualizations (not in Qiskit)
+state = Statevector(qc)
+plot_dcn(state, "bell_dcn.png")           # Dimensional Circular Notation
+plot_bloch_sphere([state], "bloch.png")   # Accepts Statevector directly
+plot_state_city(state, "state_city.png")     # Accepts Statevector directly
+
+# Pass QuantumCircuit directly to circuit visualization
+plot_circuit(qc, "circuit.png")           # Converts to quantumviz format
+```
+
+**Qiskit is optional** — install with: `pip install quantumviz[all]`
+
 ## Input Formats
 
 ### Bloch Sphere (TXT)

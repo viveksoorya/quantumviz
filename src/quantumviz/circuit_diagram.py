@@ -10,7 +10,7 @@ import json
 import matplotlib
 
 matplotlib.use('Agg')
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -113,18 +113,24 @@ def parse_circuit(data: Dict[str, Any]) -> List[List[Dict[str, Any]]]:
     return layers
 
 
-def plot_circuit(data: Dict[str, Any], output_path: Optional[str] = None, dpi: int = 150) -> plt.Figure:
+def plot_circuit(data: Union[Dict[str, Any], Any], output_path: Optional[str] = None, dpi: int = 150) -> plt.Figure:
     """
     Draw a quantum circuit diagram.
 
     Args:
-        data: Circuit dictionary with 'qubits', 'gates', and optional 'name'
+        data: Circuit dictionary with 'qubits', 'gates', and optional 'name',
+              or Qiskit QuantumCircuit object
         output_path: Path to save the figure (if None, returns figure object)
         dpi: Resolution for saved figure
 
     Returns:
         matplotlib Figure object if output_path is None, else None
     """
+    # Convert Qiskit QuantumCircuit to dict format
+    from quantumviz.qiskit_bridge import circuit_to_dict, is_quantum_circuit
+    if is_quantum_circuit(data):
+        data = circuit_to_dict(data)
+
     qubits = data['qubits']
     layers = parse_circuit(data)
     n_layers = len(layers)

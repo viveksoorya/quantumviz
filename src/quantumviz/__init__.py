@@ -26,9 +26,6 @@ from quantumviz.cost_landscape import (
     vqe_energy,
 )
 from quantumviz.dcn import (
-    parse_amplitude as dcn_parse_amplitude,
-)
-from quantumviz.dcn import (
     plot_dcn,
     plot_dcns_from_file,
 )
@@ -65,3 +62,9 @@ __all__ = [
     "plot_dcn",
     "plot_dcns_from_file",
 ]
+
+# Qiskit bridge (optional, requires qiskit installed)
+try:
+    from quantumviz import qiskit_bridge  # noqa: F401
+except ImportError:
+    pass

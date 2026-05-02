@@ -29,6 +29,7 @@ classifiers = [
 dependencies = [
     "numpy>=1.20",
     "matplotlib>=3.5",
+    "click>=8.0",
 ]
 
 [project.optional-dependencies]
@@ -41,7 +42,13 @@ dev = [
     "ruff",
     "mypy",
 ]
-all = ["quantumviz[dashboard,qiskit]"]
+all = [
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+    "pydantic>=2.0",
+    "qiskit>=1.0",
+    "qiskit-ibm-runtime>=0.20",
+]
 
 [project.scripts]
 quantumviz = "quantumviz.cli:main"

@@ -10,7 +10,7 @@ import numpy as np
 
 matplotlib.use('Agg')
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 
@@ -24,20 +24,28 @@ def parse_complex(val):
     return complex(val)
 
 
-def bloch_vector(state: List[complex]) -> np.ndarray:
+def bloch_vector(state) -> np.ndarray:
     """
     Convert a state vector to Bloch vector.
 
     Args:
-        state: List of complex amplitudes for a single qubit
+        state: List of complex amplitudes for a single qubit,
+               or Qiskit Statevector object
 
     Returns:
         numpy array [x, y, z] representing the Bloch vector
     """
-    alpha = parse_complex(state[0])
-    beta = parse_complex(state[1])
+    # Handle Qiskit Statevector objects
+    from quantumviz.qiskit_bridge import is_statevector, statevector_to_list
+    if is_statevector(state):
+        sv_list = statevector_to_list(state)
+    else:
+        sv_list = state
+
+    alpha = parse_complex(sv_list[0])
+    beta = parse_complex(sv_list[1]) if len(sv_list) >= 2 else 0j
     theta = 2 * np.arccos(np.abs(alpha))
-    phi = np.angle(beta) - np.angle(alpha)
+    phi = np.angle(beta) - np.angle(alpha) if abs(beta) > 1e-10 else 0
     x = np.sin(theta) * np.cos(phi)
     y = np.sin(theta) * np.sin(phi)
     z = np.cos(theta)
@@ -137,7 +145,7 @@ def plot_rabi_oscillation(
 
 
 def plot_time_evolution(
-    states: List[List[complex]],
+    states: Union[List[Any], Any],
     title: str = "Time Evolution",
     output_path: Optional[str] = None,
     dpi: int = 150
@@ -146,7 +154,8 @@ def plot_time_evolution(
     Plot time evolution of quantum states as trajectory on Bloch sphere.
 
     Args:
-        states: List of state vectors at different time points
+        states: List of state vectors at different time points,
+               can include Qiskit Statevector objects
         title: Title for the plot
         output_path: Path to save the figure (if None, returns figure object)
         dpi: Resolution for saved figure
@@ -154,7 +163,15 @@ def plot_time_evolution(
     Returns:
         matplotlib Figure object if output_path is None, else None
     """
-    trajectory = [bloch_vector(state) for state in states]
+    from quantumviz.qiskit_bridge import is_statevector, statevector_to_list
+
+    trajectory = []
+    for state in states:
+        if is_statevector(state):
+            sv_list = statevector_to_list(state)
+            trajectory.append(bloch_vector(sv_list))
+        else:
+            trajectory.append(bloch_vector(state))
 
     n = len(trajectory)
     cols = min(4, n)

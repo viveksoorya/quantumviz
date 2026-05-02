@@ -49,9 +49,23 @@ def main():
 @click.option("-f", "--format", "fmt", type=click.Choice(["png", "pdf", "svg"], case_sensitive=False), default="png", help="Output format (png, pdf, svg)")
 @click.option("--dpi", default=150, help="DPI for saved figure")
 def bloch_sphere(input_file, output_file, fmt, dpi):
-    """Plot Bloch sphere visualization from input file."""
+    """Plot Bloch sphere visualization from input file or Qiskit object."""
     output_file = _output_path(input_file, "", fmt, output_file)
-    _plot_bloch_sphere(input_file, output_file, dpi)
+
+    # Check for Qiskit QPY format
+    if input_file.endswith('.qpy'):
+        try:
+            from qiskit import QuantumCircuit
+            from qiskit.quantum_info import Statevector
+            qc = QuantumCircuit.from_qpy(input_file)
+            sv = Statevector.from_circuit(qc)
+            _plot_bloch_sphere([sv], output_file, dpi)
+        except ImportError:
+            click.echo("Error: Qiskit not installed. Install with: pip install qiskit", err=True)
+            sys.exit(1)
+    else:
+        _plot_bloch_sphere(input_file, output_file, dpi)
+
     click.echo(f"Saved: {output_file}")
 
 
@@ -61,10 +75,28 @@ def bloch_sphere(input_file, output_file, fmt, dpi):
 @click.option("-f", "--format", "fmt", type=click.Choice(["png", "pdf", "svg"], case_sensitive=False), default="png", help="Output format (png, pdf, svg)")
 @click.option("--dpi", default=150, help="DPI for saved figures")
 def state_city(input_file, output_dir, fmt, dpi):
-    """Plot State City visualization from JSON input file."""
-    output_files = _plot_state_cities(input_file, output_dir, dpi, fmt)
-    for f in output_files:
-        click.echo(f"Saved: {f}")
+    """Plot State City visualization from JSON input file or Qiskit object."""
+    # Check for Qiskit QPY format
+    if input_file.endswith('.qpy'):
+        try:
+            from qiskit import QuantumCircuit
+            from qiskit.quantum_info import Statevector
+            qc = QuantumCircuit.from_qpy(input_file)
+            sv = Statevector.from_circuit(qc)
+            if output_dir:
+                output_file = f"{output_dir}/state_city.{fmt}"
+            else:
+                output_file = f"state_city.{fmt}"
+            from quantumviz.state_city import plot_state_city
+            plot_state_city(sv, "State City", output_file, dpi)
+            click.echo(f"Saved: {output_file}")
+        except ImportError:
+            click.echo("Error: Qiskit not installed. Install with: pip install qiskit", err=True)
+            sys.exit(1)
+    else:
+        output_files = _plot_state_cities(input_file, output_dir, dpi, fmt)
+        for f in output_files:
+            click.echo(f"Saved: {f}")
 
 
 @main.command()
@@ -122,15 +154,24 @@ def cost_landscape(algorithm, input_file, output_file, fmt, dpi):
 @click.option("-f", "--format", "fmt", type=click.Choice(["png", "pdf", "svg"], case_sensitive=False), default="png", help="Output format (png, pdf, svg)")
 @click.option("--dpi", default=150, help="DPI for saved figure")
 def circuit(input_file, output_file, fmt, dpi):
-    """Plot quantum circuit diagram from JSON input file."""
-    import json
-
+    """Plot quantum circuit diagram from JSON or QPY input file."""
     output_file = _output_path(input_file, '_circuit', fmt, output_file)
 
-    with open(input_file, 'r') as f:
-        data = json.load(f)
+    # Check for Qiskit QPY format
+    if input_file.endswith('.qpy'):
+        try:
+            from qiskit import QuantumCircuit
+            qc = QuantumCircuit.from_qpy(input_file)
+            _draw_circuit(qc, output_file, dpi)
+        except ImportError:
+            click.echo("Error: Qiskit not installed. Install with: pip install qiskit", err=True)
+            sys.exit(1)
+    else:
+        import json
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+        _draw_circuit(data, output_file, dpi)
 
-    _draw_circuit(data, output_file, dpi)
     click.echo(f"Saved: {output_file}")
 
 
@@ -140,10 +181,24 @@ def circuit(input_file, output_file, fmt, dpi):
 @click.option("-f", "--format", "fmt", type=click.Choice(["png", "pdf", "svg"], case_sensitive=False), default="png", help="Output format (png, pdf, svg)")
 @click.option("--dpi", default=150, help="DPI for saved figure")
 def dynamic_flow(input_file, output_file, fmt, dpi):
-    """Plot dynamic flow/time evolution from JSON input file."""
+    """Plot dynamic flow/time evolution from JSON or QPY input file."""
     output_file = _output_path(input_file, '_flow', fmt, output_file)
 
-    _plot_dynamic_flow(input_file, output_file, dpi)
+    # Check for Qiskit QPY format
+    if input_file.endswith('.qpy'):
+        try:
+            from qiskit import QuantumCircuit
+            from qiskit.quantum_info import Statevector
+            qc = QuantumCircuit.from_qpy(input_file)
+            sv = Statevector.from_circuit(qc)
+            from quantumviz.dynamic_flow import plot_time_evolution
+            plot_time_evolution([sv], "Time Evolution", output_file, dpi)
+        except ImportError:
+            click.echo("Error: Qiskit not installed. Install with: pip install qiskit", err=True)
+            sys.exit(1)
+    else:
+        _plot_dynamic_flow(input_file, output_file, dpi)
+
     click.echo(f"Saved: {output_file}")
 
 
@@ -153,36 +208,52 @@ def dynamic_flow(input_file, output_file, fmt, dpi):
 @click.option("-f", "--format", "fmt", type=click.Choice(["png", "pdf", "svg"], case_sensitive=False), default="png", help="Output format (png, pdf, svg)")
 @click.option("--dpi", default=150, help="DPI for saved figure")
 def dcn(input_file, output_file, fmt, dpi):
-    """Plot Dimensional Circular Notation (DCN) from JSON input file."""
+    """Plot Dimensional Circular Notation (DCN) from JSON or QPY input file."""
     if output_file is None:
         # Determine output based on input
         if input_file.endswith('.json'):
             output_file = input_file.replace('.json', f'_dcn.{fmt}')
+        elif input_file.endswith('.qpy'):
+            output_file = input_file.replace('.qpy', f'_dcn.{fmt}')
         else:
             output_file = input_file + f'_dcn.{fmt}'
 
-    # Check if input is a directory (for multiple stages) or single file
-    import os
-    if os.path.isdir(input_file):
-        _plot_dcn(input_file, output_file, dpi, fmt)
+    # Check for Qiskit QPY format
+    if input_file.endswith('.qpy'):
+        try:
+            from qiskit import QuantumCircuit
+            from qiskit.quantum_info import Statevector
+            qc = QuantumCircuit.from_qpy(input_file)
+            sv = Statevector.from_circuit(qc)
+            from quantumviz.dcn import plot_dcn
+            plot_dcn(sv, "DCN Visualization", output_file, dpi)
+        except ImportError:
+            click.echo("Error: Qiskit not installed. Install with: pip install qiskit", err=True)
+            sys.exit(1)
     else:
-        # Single stage - determine if output is file or directory
-        if output_file and output_file.endswith('/'):
-            # Treat as directory
+        # Check if input is a directory (for multiple stages) or single file
+        import os
+        if os.path.isdir(input_file):
             _plot_dcn(input_file, output_file, dpi, fmt)
         else:
-            # Treat as file - extract filename and call plot_dcn directly
-            from quantumviz.dcn import plot_dcns_from_file
-            # Create temp dir, save there, then rename
-            import tempfile
-            with tempfile.TemporaryDirectory() as tmpdir:
-                plot_dcns_from_file(input_file, tmpdir, dpi, fmt)
-                # Find the generated file and rename to desired output
-                import glob
-                generated = glob.glob(f'{tmpdir}/*')
-                if generated and output_file:
-                    import shutil
-                    shutil.move(generated[0], output_file)
+            # Single stage - determine if output is file or directory
+            if output_file and output_file.endswith('/'):
+                # Treat as directory
+                _plot_dcn(input_file, output_file, dpi, fmt)
+            else:
+                # Treat as file - extract filename and call plot_dcn directly
+                # Create temp dir, save there, then rename
+                import tempfile
+
+                from quantumviz.dcn import plot_dcns_from_file
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    plot_dcns_from_file(input_file, tmpdir, dpi, fmt)
+                    # Find the generated file and rename to desired output
+                    import glob
+                    generated = glob.glob(f'{tmpdir}/*')
+                    if generated and output_file:
+                        import shutil
+                        shutil.move(generated[0], output_file)
     click.echo(f"Saved: {output_file}")
 
 

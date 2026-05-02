@@ -12,7 +12,7 @@ A visualization where:
 
 import json
 import os
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -76,7 +76,7 @@ def is_separable_along_qubit(state_vector: List[complex], n_qubits: int, qubit_i
 
 
 def plot_dcn(
-    state_vector: List[complex],
+    state: Union[List[complex], Any],
     title: str = "DCN Visualization",
     output_path: Optional[str] = None,
     dpi: int = 150
@@ -94,7 +94,7 @@ def plot_dcn(
     For 3 qubits: 2D projection of 3D cube (front face Q3=0, back face Q3=1)
 
     Args:
-        state_vector: List of complex amplitudes
+        state: List of complex amplitudes, or Qiskit Statevector object
         title: Title for the plot
         output_path: Path to save figure
         dpi: Resolution
@@ -102,6 +102,13 @@ def plot_dcn(
     Returns:
         matplotlib Figure if output_path is None
     """
+    # Handle Qiskit Statevector objects
+    from quantumviz.qiskit_bridge import is_statevector, statevector_to_list
+    if is_statevector(state):
+        state_vector = statevector_to_list(state)
+    else:
+        state_vector = state
+
     n = len(state_vector)
     if n == 0:
         raise ValueError("State vector cannot be empty")

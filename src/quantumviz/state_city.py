@@ -12,7 +12,7 @@ import matplotlib
 import numpy as np
 
 matplotlib.use('Agg')
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 import matplotlib.pyplot as plt
 
@@ -67,7 +67,7 @@ def state_to_density(state_vector: List[complex]) -> np.ndarray:
 
 
 def plot_state_city(
-    state_vector: List[complex],
+    state: Union[List[complex], Any],
     title: str = "Density Matrix",
     output_path: Optional[str] = None,
     dpi: int = 150
@@ -76,7 +76,8 @@ def plot_state_city(
     Create a state city plot (real and imaginary parts of density matrix).
 
     Args:
-        state_vector: List of complex amplitudes (length must be power of 2)
+        state: List of complex amplitudes (length must be power of 2),
+               or Qiskit Statevector, or Qiskit DensityMatrix
         title: Title for the plot
         output_path: Path to save the figure (if None, returns figure object)
         dpi: Resolution for saved figure
@@ -84,7 +85,21 @@ def plot_state_city(
     Returns:
         matplotlib Figure object if output_path is None, else None
     """
-    rho = state_to_density(state_vector)
+    from quantumviz.qiskit_bridge import (
+        density_matrix_to_array,
+        is_density_matrix,
+        is_statevector,
+        statevector_to_list,
+    )
+
+    if is_statevector(state):
+        sv_list = statevector_to_list(state)
+        rho = state_to_density(sv_list)
+    elif is_density_matrix(state):
+        rho = density_matrix_to_array(state)
+    else:
+        rho = state_to_density(state)
+
     dim = rho.shape[0]
 
     xpos, ypos = np.meshgrid(range(dim), range(dim), indexing='ij')
@@ -168,7 +183,13 @@ def plot_state_cities_from_file(
     for i, stage in enumerate(stages):
         name = stage.get('name', f'Stage {i+1}')
         raw_state = stage['state_vector']
-        state_vector = [parse_amplitude(amp) for amp in raw_state]
+
+        # Handle Qiskit Statevector objects
+        from quantumviz.qiskit_bridge import is_statevector, statevector_to_list
+        if is_statevector(raw_state):
+            state_vector = statevector_to_list(raw_state)
+        else:
+            state_vector = [parse_amplitude(amp) for amp in raw_state]
 
         if len(state_vector) != dim:
             raise ValueError(f"Stage '{name}': state vector length {len(state_vector)} "

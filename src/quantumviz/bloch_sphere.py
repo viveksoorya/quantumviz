@@ -10,7 +10,7 @@ import numpy as np
 
 matplotlib.use('Agg')
 import re
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 import matplotlib.pyplot as plt
 
@@ -178,6 +178,33 @@ def parse_stage(line: str) -> Optional[np.ndarray]:
     raise ValueError(f"Unable to parse line: {line}")
 
 
+def state_to_bloch(state_vector) -> np.ndarray:
+    """
+    Convert a state vector (list of complex) or Qiskit Statevector to Bloch vector.
+
+    Args:
+        state_vector: List of complex amplitudes [alpha, beta] or Qiskit Statevector
+
+    Returns:
+        numpy array [x, y, z] representing the Bloch vector
+    """
+    # Handle Qiskit Statevector objects
+    from quantumviz.qiskit_bridge import is_statevector, statevector_to_list
+    if is_statevector(state_vector):
+        sv_list = statevector_to_list(state_vector)
+    else:
+        sv_list = state_vector
+
+    alpha = complex(sv_list[0])
+    beta = complex(sv_list[1]) if len(sv_list) >= 2 else 0j
+    theta = 2 * np.arccos(np.abs(alpha))
+    phi = np.angle(beta) - np.angle(alpha) if abs(beta) > 1e-10 else 0
+    x = np.sin(theta) * np.cos(phi)
+    y = np.sin(theta) * np.sin(phi)
+    z = np.cos(theta)
+    return np.array([x, y, z])
+
+
 def draw_bloch_sphere(ax, vector: np.ndarray, title: str = "") -> None:
     """
     Draw a Bloch sphere on the given 3D axes with the state vector.
@@ -211,7 +238,7 @@ def draw_bloch_sphere(ax, vector: np.ndarray, title: str = "") -> None:
 
 
 def plot_bloch_sphere(
-    states: Union[str, List[str]],
+    states: Union[str, List[Any], Any],
     output_path: Optional[str] = None,
     dpi: int = 150
 ) -> plt.Figure:
@@ -220,31 +247,61 @@ def plot_bloch_sphere(
 
     Args:
         states: Either a filename (str) containing one stage per line,
-                or a list of strings describing states
+                or a list of states (strings, complex lists, or Qiskit Statevector),
+                or a single Qiskit Statevector
         output_path: Path to save the figure (if None, returns figure object)
         dpi: Resolution for saved figure
 
     Returns:
         matplotlib Figure object if output_path is None, else None
     """
-    if isinstance(states, str):
-        with open(states, 'r') as f:
-            lines = f.readlines()
-    else:
-        lines = states
+    from quantumviz.qiskit_bridge import is_statevector
 
     vectors = []
     titles = []
     stage_num = 0
-    for i, line in enumerate(lines):
-        try:
-            vec = parse_stage(line)
-            if vec is not None:
+
+    # Handle single Qiskit Statevector
+    if is_statevector(states):
+        vec = state_to_bloch(states)
+        vectors.append(vec)
+        titles.append("State")
+    elif isinstance(states, str):
+        # Filename - read and parse
+        with open(states, 'r') as f:
+            lines = f.readlines()
+        for i, line in enumerate(lines):
+            try:
+                vec = parse_stage(line)
+                if vec is not None:
+                    stage_num += 1
+                    vectors.append(vec)
+                    titles.append(f"Stage {stage_num}")
+            except Exception as e:
+                print(f"Error in line {i+1}: {line.strip()}\n{e}")
+    else:
+        # List of states
+        for item in states:
+            if is_statevector(item):
+                vec = state_to_bloch(item)
                 stage_num += 1
                 vectors.append(vec)
-                titles.append(f"Stage {stage_num}")
-        except Exception as e:
-            print(f"Error in line {i+1}: {line.strip()}\n{e}")
+                titles.append(f"State {stage_num}")
+            elif isinstance(item, str):
+                try:
+                    vec = parse_stage(item)
+                    if vec is not None:
+                        stage_num += 1
+                        vectors.append(vec)
+                        titles.append(f"Stage {stage_num}")
+                except Exception as e:
+                    print(f"Error parsing '{item}': {e}")
+            else:
+                # Assume it's a state vector list
+                vec = state_to_bloch(item)
+                stage_num += 1
+                vectors.append(vec)
+                titles.append(f"State {stage_num}")
 
     if not vectors:
         raise ValueError("No valid stages found.")
