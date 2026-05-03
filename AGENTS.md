@@ -29,7 +29,8 @@ quantumviz cost-landscape qaoa input.json -o out.png
 quantumviz cost-landscape vqe input.json -o out.png
 quantumviz dynamic-flow input.json -o out.png
 quantumviz dcn input.json -o out.pdf -f pdf
-quantumviz serve                               # Dashboard at localhost:8000
+quantumviz gui                                  # Launch desktop GUI app
+quantumviz serve                               # Dashboard at localhost:8000 (web)
 ```
 
 ### Output Format Options

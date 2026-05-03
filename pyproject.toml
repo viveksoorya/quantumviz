@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantumvisualization"
-version = "0.1.0"
+version = "0.3.0"
 description = "Quantum algorithm visualization library"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -33,7 +33,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dashboard = ["fastapi>=0.100", "uvicorn>=0.20", "pydantic>=2.0"]
+dashboard = ["fastapi>=0.100", "uvicorn>=0.20", "pydantic>=2.0", "python-multipart>=0.0.6"]
+gui = ["PyQt6>=6.5.0"]
 qiskit = ["qiskit>=1.0", "qiskit-ibm-runtime>=0.20"]
 dev = [
     "pytest>=7.0",
@@ -46,6 +47,7 @@ all = [
     "fastapi>=0.100",
     "uvicorn>=0.20",
     "pydantic>=2.0",
+    "python-multipart>=0.0.6",
     "qiskit>=1.0",
     "qiskit-ibm-runtime>=0.20",
 ]

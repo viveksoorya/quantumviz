@@ -11,6 +11,7 @@ A Python library for visualizing quantum algorithm states including Bloch sphere
 - **Dynamic Flow** - Visualize time evolution and Rabi oscillations
 - **Dimensional Circular Notation (DCN)** - Visualize quantum states with circular notation showing magnitude and phase
 - **Interactive Dashboard** - Web-based interface for quantum state visualization
+- **Desktop GUI Application** - PyQt6-based desktop application for interactive visualization
 - **Hardware Integration** - Run circuits on IBM Quantum hardware (requires Qiskit)
 
 ## Installation
@@ -31,6 +32,12 @@ pip install quantumviz[dashboard]
 
 ```bash
 pip install quantumviz[all]
+```
+
+### With Desktop GUI
+
+```bash
+pip install quantumviz[gui]
 ```
 
 ## Quick Start
@@ -70,6 +77,9 @@ quantumviz dcn input.json -o output.pdf -f pdf
 
 # Start dashboard
 quantumviz serve
+
+# Launch desktop GUI application
+quantumviz gui
 ```
 
 ### Output Format Options
