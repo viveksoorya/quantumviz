@@ -40,6 +40,9 @@
         .algo-btn.selected { border-color: #667eea; background: #667eea20; }
         .algo-btn .icon { font-size: 2em; margin-bottom: 5px; }
         footer { text-align: center; color: white; margin-top: 30px; opacity: 0.8; }
+        .algo-params { display: none; }
+        .algo-params h2 { margin-top: 0; }
+        #basis-checkboxes label { margin-right: 10px; }
     </style>
 </head>
 <body>
@@ -49,22 +52,22 @@
         <div class="card">
             <h2>Select Algorithm</h2>
             <div class="algorithm-selector">
-                <div class="algo-btn selected" onclick="selectAlgo('grover')">
+                <div class="algo-btn selected" onclick="selectAlgo(event, 'grover')">
                     <div class="icon">🔍</div>
                     <div>Grover's Search</div>
                     <div style="font-size:0.8em;color:#666">Oracle-based</div>
                 </div>
-                <div class="algo-btn" onclick="selectAlgo('qft')">
+                <div class="algo-btn" onclick="selectAlgo(event, 'qft')">
                     <div class="icon">🌊</div>
                     <div>QFT</div>
                     <div style="font-size:0.8em;color:#666">Transform-based</div>
                 </div>
-                <div class="algo-btn" onclick="selectAlgo('qaoa')">
+                <div class="algo-btn" onclick="selectAlgo(event, 'qaoa')">
                     <div class="icon">⚡</div>
                     <div>QAOA</div>
                     <div style="font-size:0.8em;color:#666">Variational</div>
                 </div>
-                <div class="algo-btn" onclick="selectAlgo('vqe')">
+                <div class="algo-btn" onclick="selectAlgo(event, 'vqe')">
                     <div class="icon">⚛️</div>
                     <div>VQE</div>
                     <div style="font-size:0.8em;color:#666">Variational</div>
@@ -92,19 +95,98 @@
             </div>
         </div>
         
-        <div class="card">
-            <h2>📊 Bloch Sphere</h2>
-            <div id="bloch-viz" style="width:100%;height:500px;"></div>
+        <div class="card algo-params" id="grover-params">
+            <h2>Grover's Algorithm Parameters</h2>
+            <div class="controls">
+                <div>
+                    <label>Good States (mark for search):</label>
+                    <div id="basis-checkboxes"></div>
+                </div>
+                <div>
+                    <label>Initial State:
+                        <select id="grover-init-state">
+                            <option value="zero">|00...0⟩ (Default)</option>
+                            <option value="superposition">Uniform Superposition (H⊗n)</option>
+                        </select>
+                    </label>
+                </div>
+                <button onclick="updateVisualization()">Update Visualization</button>
+            </div>
+        </div>
+        
+        <div class="card algo-params" id="qaoa-params" style="display:none;">
+            <h2>QAOA Parameters</h2>
+            <div class="controls">
+                <label>p (layers): <input type="number" id="qaoa-p" value="1" min="1" max="5"></label>
+                <label>Graph (edges): <input type="text" id="qaoa-graph" value="[(0,1),(1,2),(2,0)]" style="width:300px;"></label>
+                <button onclick="updateVisualization()">Update Visualization</button>
+            </div>
+        </div>
+        
+        <div class="card algo-params" id="qft-params" style="display:none;">
+            <h2>QFT Parameters</h2>
+            <div class="controls">
+                <p>QFT automatically transforms the input state to Fourier basis.</p>
+            </div>
+        </div>
+        
+        <div class="card algo-params" id="vqe-params" style="display:none;">
+            <h2>VQE Parameters</h2>
+            <div class="controls">
+                <label>Ansatz Type:
+                    <select id="vqe-ansatz">
+                        <option value="ry">RY Ansatz</option>
+                        <option value="u3">U3 Ansatz</option>
+                    </select>
+                </label>
+                <label>Layers: <input type="number" id="vqe-layers" value="1" min="1" max="5"></label>
+                <button onclick="updateVisualization()">Update Visualization</button>
+            </div>
         </div>
         
         <div class="card">
-            <h2>📈 Probability Distribution</h2>
-            <div id="prob-viz" style="width:100%;height:400px;"></div>
+            <h2>📁 Upload File</h2>
+            <div class="controls">
+                <input type="file" id="file-upload" accept=".json,.txt,.qpy">
+                <button onclick="uploadFile()">Upload & Visualize</button>
+                <span id="upload-status" style="margin-left:10px;"></span>
+            </div>
+            <div id="file-preview" style="margin-top:10px;"></div>
         </div>
         
         <div class="card">
-            <h2>🔲 Density Matrix (Real Part)</h2>
-            <div id="density-viz" style="width:100%;height:400px;"></div>
+            <h2>📊 Visualizations</h2>
+            <div class="tabs">
+                <div class="tab active" onclick="showTab(event, 'bloch')">Bloch Sphere</div>
+                <div class="tab" onclick="showTab(event, 'prob')">Probabilities</div>
+                <div class="tab" onclick="showTab(event, 'dcn')">DCN</div>
+                <div class="tab" onclick="showTab(event, 'state-city')">State City</div>
+                <div class="tab" onclick="showTab(event, 'circuit')">Circuit</div>
+                <div class="tab" onclick="showTab(event, 'cost-landscape')">Cost Landscape</div>
+                <div class="tab" onclick="showTab(event, 'dynamic-flow')">Dynamic Flow</div>
+            </div>
+            
+            <div id="tab-bloch" class="tab-content active">
+                <div id="bloch-viz" style="width:100%;height:500px;"></div>
+            </div>
+            <div id="tab-prob" class="tab-content">
+                <div id="prob-viz" style="width:100%;height:400px;"></div>
+            </div>
+            <div id="tab-dcn" class="tab-content">
+                <div id="dcn-viz">Select algorithm and click Update to render</div>
+            </div>
+            <div id="tab-state-city" class="tab-content">
+                <div id="state-city-viz">Select algorithm and click Update to render</div>
+            </div>
+            <div id="tab-circuit" class="tab-content">
+                <div id="circuit-viz">Select algorithm and click Update to render</div>
+            </div>
+            <div id="tab-cost-landscape" class="tab-content">
+                <div id="cost-landscape-viz">Select algorithm and click Update to render</div>
+            </div>
+            <div id="tab-dynamic-flow" class="tab-content">
+                <div id="dynamic-flow-viz">Select algorithm and click Update to render</div>
+            </div>
         </div>
         
         <div class="card">
@@ -163,10 +245,6 @@
                     2: [
                         {name: "|01⟩ Input", state: [0, 1, 0, 0]},
                         {name: "After QFT", state: [0.5, 0.5, -0.5, -0.5]}
-                    ],
-                    3: [
-                        {name: "|001⟩ Input", state: [0, 0, 1, 0, 0, 0, 0, 0]},
-                        {name: "After QFT", state: [0.354, 0.25+0.25j, 0.354j, -0.25+0.25j, -0.354, -0.25-0.25j, -0.354j, 0.25-0.25j]}
                     ]
                 }
             },
@@ -179,10 +257,6 @@
                         {name: "γ=0.5, β=0.3", state: [0.4, 0.4, 0.6, 0.6]},
                         {name: "γ=0.8, β=0.6", state: [0.3, 0.3, 0.7, 0.7]},
                         {name: "γ=1.0, β=0.8", state: [0.2, 0.2, 0.8, 0.8]}
-                    ],
-                    3: [
-                        {name: "Initial", state: [0.354, 0.354, 0.354, 0.354, 0.354, 0.354, 0.354, 0.354]},
-                        {name: "p=1", state: [0.3, 0.3, 0.4, 0.4, 0.5, 0.5, 0.6, 0.6]}
                     ]
                 }
             },
@@ -195,28 +269,51 @@
                         {name: "θ=0.5", state: [0.6, 0.6, 0.3, 0.3]},
                         {name: "θ=1.0", state: [0.4, 0.4, 0.6, 0.6]},
                         {name: "θ=1.57 (Optimal)", state: [0.2, 0.2, 0.7, 0.7]}
-                    ],
-                    3: [
-                        {name: "Initial", state: [0.577, 0.577, 0.577, 0, 0.577, 0, 0, 0]},
-                        {name: "θ=1.0", state: [0.4, 0.4, 0.5, 0.3, 0.5, 0.3, 0.4, 0.3]}
                     ]
                 }
             }
         };
         
-        function selectAlgo(algo) {
+        function selectAlgo(event, algo) {
             currentAlgorithm = algo;
             document.querySelectorAll('.algo-btn').forEach(btn => btn.classList.remove('selected'));
-            event.target.closest('.algo-btn').classList.add('selected');
+            event.currentTarget.classList.add('selected');
+            
+            // Show/hide parameter sections
+            document.querySelectorAll('.algo-params').forEach(el => el.style.display = 'none');
+            const paramsDiv = document.getElementById(algo + '-params');
+            if (paramsDiv) paramsDiv.style.display = 'block';
+            
+            // Generate basis checkboxes for Grover
+            if (algo === 'grover') {
+                generateBasisCheckboxes();
+            }
+            
             updateVisualization();
         }
         
-        function updateVisualization() {
+        function generateBasisCheckboxes() {
+            const qubits = parseInt(document.getElementById('qubits').value);
+            const container = document.getElementById('basis-checkboxes');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            for (let i = 0; i < Math.pow(2, qubits); i++) {
+                let bin = i.toString(2).padStart(qubits, '0');
+                const checkbox = document.createElement('label');
+                checkbox.style.marginRight = '10px';
+                checkbox.innerHTML = `<input type="checkbox" value="${bin}"> |${bin}⟩`;
+                container.appendChild(checkbox);
+            }
+        }
+        
+        async function updateVisualization() {
             const qubits = parseInt(document.getElementById('qubits').value);
             const stageSelect = document.getElementById('stage').value;
             const data = algorithmData[currentAlgorithm];
             const stages = data.stages[qubits] || data.stages[2];
             
+            // Update stats and info
             document.getElementById('stats').innerHTML = `
                 <div class="stat"><div class="stat-value">${qubits}</div><div class="stat-label">Qubits</div></div>
                 <div class="stat"><div class="stat-value">${stages.length}</div><div class="stat-label">Stages</div></div>
@@ -228,149 +325,224 @@
                 <p>${data.description}</p>
             `;
             
-            if (stageSelect === 'all') {
-                stages.forEach((stage, i) => {
-                    if (i === 0) plotBlochSphere(stage.state, `Stage ${i+1}: ${stage.name}`);
-                    plotProbabilities(stage.state, qubits, `Prob ${i+1}`, i);
-                });
-            } else {
-                const idx = parseInt(stageSelect);
-                const stage = stages[idx];
-                plotBlochSphere(stage.state, stage.name);
-                plotProbabilities(stage.state, qubits, stage.name);
-            }
-        }
-        
-        function plotBlochSphere(state, title = '') {
-            const [alpha, beta] = [complex(state[0]), complex(state[1] || state[0])];
-            const theta = 2 * Math.acos(Math.abs(alpha));
-            const phi = Math.angle(beta) - Math.angle(alpha);
-            const x = Math.sin(theta) * Math.cos(phi);
-            const y = Math.sin(theta) * Math.sin(phi);
-            const z = Math.cos(theta);
-            
-            const u = npLinspace(0, 2 * Math.PI, 30);
-            const v = npLinspace(0, Math.PI, 30);
-            const sphereX = [], sphereY = [], sphereZ = [];
-            for (let i = 0; i < u.length; i++) {
-                sphereX.push([]); sphereY.push([]); sphereZ.push([]);
-                for (let j = 0; j < v.length; j++) {
-                    sphereX[i].push(Math.cos(u[i]) * Math.sin(v[j]));
-                    sphereY[i].push(Math.sin(u[i]) * Math.sin(v[j]));
-                    sphereZ[i].push(Math.cos(v[j]));
-                }
+            // Collect algorithm parameters
+            let params = {};
+            if (currentAlgorithm === 'grover') {
+                const checkboxes = document.querySelectorAll('#basis-checkboxes input[type="checkbox"]');
+                const goodStates = Array.from(checkboxes)
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value);
+                params = {
+                    good_states: goodStates.length > 0 ? goodStates : ['11'],
+                    init_state: document.getElementById('grover-init-state').value
+                };
+            } else if (currentAlgorithm === 'qaoa') {
+                params = {
+                    p: parseInt(document.getElementById('qaoa-p').value) || 1,
+                    graph: JSON.parse(document.getElementById('qaoa-graph').value || '[(0,1),(1,2),(2,0)]')
+                };
+            } else if (currentAlgorithm === 'vqe') {
+                params = {
+                    ansatz: document.getElementById('vqe-ansatz').value,
+                    layers: parseInt(document.getElementById('vqe-layers').value) || 1
+                };
             }
             
-            const trace1 = {
-                type: 'surface',
-                x: sphereX, y: sphereY, z: sphereZ,
-                colorscale: [[0, 'rgb(100,200,255)'], [1, 'rgb(100,200,255)']],
-                opacity: 0.3, showscale: false,
-                hoverinfo: 'skip'
-            };
+            // Call backend API with algorithm parameters
+            const response = await fetch('/api/visualize', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    qubits: qubits,
+                    algorithm: currentAlgorithm,
+                    params: params
+                })
+            });
             
-            const trace2 = {
-                type: 'scatter3d', mode: 'lines+markers',
-                x: [0, x], y: [0, y], z: [0, z],
-                marker: { size: 5, color: 'black' },
-                line: { color: 'black', width: 5 },
-                name: 'State Vector'
-            };
+            const result = await response.json();
             
-            const layout = {
-                title: `Bloch Sphere: ${title}`,
-                scene: {
-                    xaxis: { title: 'X', range: [-1.5, 1.5], gridcolor: '#ddd' },
-                    yaxis: { title: 'Y', range: [-1.5, 1.5], gridcolor: '#ddd' },
-                    zaxis: { title: 'Z', range: [-1.5, 1.5], gridcolor: '#ddd' },
-                    aspectmode: 'cube',
-                    bgcolor: 'white'
-                },
-                margin: { l: 0, r: 0, t: 50, b: 0 },
-                showlegend: false,
-                height: 500
-            };
-            
-            Plotly.newPlot('bloch-viz', [trace1, trace2], layout);
-        }
-        
-        function plotProbabilities(state, qubits, title, index = 0) {
-            const dim = Math.pow(2, qubits);
-            let probs = [];
-            for (let i = 0; i < dim; i++) {
-                const amp = complex(state[i] || 0);
-                probs.push(amp.re * amp.re + amp.im * amp.im);
+            if (result.error) {
+                console.error('Visualization error:', result.error);
+                return;
             }
             
-            const labels = [];
-            for (let i = 0; i < dim; i++) {
-                let bin = i.toString(2);
-                while (bin.length < qubits) bin = '0' + bin;
-                labels.push('|' + bin + '⟩');
+            // Render visualizations based on active tab
+            const activeTab = document.querySelector('.tab-content.active');
+            if (!activeTab) return;
+            
+            // Always update Bloch and Probability (they share the same data)
+            if (result.bloch_plot) {
+                Plotly.newPlot('bloch-viz', result.bloch_plot.data, result.bloch_plot.layout);
+            }
+            if (result.probability_plot) {
+                Plotly.newPlot('prob-viz', result.probability_plot.data, result.probability_plot.layout);
             }
             
-            const trace = {
-                type: 'bar',
-                x: labels,
-                y: probs,
-                marker: { 
-                    color: probs.map(p => p > 0.5 ? '#4CAF50' : p > 0.1 ? '#FFC107' : '#667eea'),
-                    line: { color: '#333', width: 1 }
-                },
-                text: probs.map(p => p.toFixed(3)),
-                textposition: 'auto'
-            };
-            
-            const layout = {
-                title: `Probabilities: ${title}`,
-                xaxis: { title: 'Basis State', tickangle: -45 },
-                yaxis: { title: 'Probability', range: [0, 1.1] },
-                height: 350,
-                margin: { l: 50, r: 20, t: 50, b: 100 }
-            };
-            
-            Plotly.newPlot('prob-viz', [trace], layout);
-        }
-        
-        function complex(val) {
-            if (typeof val === 'number') return { re: val, im: 0 };
-            if (typeof val === 'string') {
-                val = val.replace(/\s/g, '');
-                if (val.includes('+') || val.includes('-')) {
-                    const [re, im] = val.split(/([+-])/);
-                    return { 
-                        re: parseFloat(re) || 0, 
-                        im: parseFloat(im + (val.match(/[+-]\d*\.?\d*j?$/)?.[0]?.replace('j','') || '0')) || 0 
-                    };
-                }
-                if (val.includes('j')) return { re: 0, im: parseFloat(val) || 1 };
-                return { re: parseFloat(val), im: 0 };
+            // Render other visualizations if their tabs are active
+            if (activeTab.id === 'tab-dcn' && !document.getElementById('dcn-viz').dataset.rendered) {
+                renderVisualization('dcn');
+            } else if (activeTab.id === 'tab-state-city' && !document.getElementById('state-city-viz').dataset.rendered) {
+                renderVisualization('state-city');
+            } else if (activeTab.id === 'tab-circuit' && !document.getElementById('circuit-viz').dataset.rendered) {
+                renderVisualization('circuit');
+            } else if (activeTab.id === 'tab-cost-landscape' && !document.getElementById('cost-landscape-viz').dataset.rendered) {
+                renderVisualization('cost-landscape');
+            } else if (activeTab.id === 'tab-dynamic-flow' && !document.getElementById('dynamic-flow-viz').dataset.rendered) {
+                renderVisualization('dynamic-flow');
             }
-            if (val && typeof val === 'object' && val.im !== undefined) return val;
-            return { re: 0, im: 0 };
-        }
-        
-        function npLinspace(start, end, num) {
-            const arr = [];
-            for (let i = 0; i < num; i++) {
-                arr.push(start + (end - start) * i / (num - 1));
-            }
-            return arr;
         }
         
         function animateAlgorithm() {
             const qubits = parseInt(document.getElementById('qubits').value);
             const stages = algorithmData[currentAlgorithm].stages[qubits];
             let current = 0;
-            
+
             if (animationInterval) clearInterval(animationInterval);
-            
+
             animationInterval = setInterval(() => {
-                const stage = stages[current];
-                plotBlochSphere(stage.state, stage.name);
-                plotProbabilities(stage.state, qubits, stage.name);
+                document.getElementById('stage').value = current;
+                updateVisualization();
                 current = (current + 1) % stages.length;
-            }, 1500);
+            }, 3000);
+        }
+        
+        function showTab(event, tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.add('active');
+            
+            // Always render visualization when tab is clicked
+            renderVisualization(tabName);
+        }
+        
+        async function renderVisualization(vizType) {
+            const qubits = parseInt(document.getElementById('qubits').value);
+            let apiEndpoint = '';
+            let requestBody = {};
+            
+            // Get algorithm data
+            const data = algorithmData[currentAlgorithm];
+            const stages = data.stages[qubits] || data.stages[2];
+            const lastStage = stages[stages.length - 1];
+            
+            switch(vizType) {
+                case 'dcn':
+                    apiEndpoint = '/api/visualize/dcn';
+                    requestBody = { qubits: qubits, stages: [lastStage] };
+                    break;
+                case 'state-city':
+                    apiEndpoint = '/api/visualize/state-city';
+                    requestBody = { qubits: qubits, stages: [lastStage] };
+                    break;
+                case 'circuit':
+                    apiEndpoint = '/api/visualize/circuit';
+                    requestBody = { qubits: qubits, gates: [], name: currentAlgorithm };
+                    break;
+                case 'cost-landscape':
+                    apiEndpoint = '/api/visualize/cost-landscape';
+                    requestBody = { algorithm: currentAlgorithm === 'qaoa' ? 'qaoa' : 'vqe' };
+                    break;
+                case 'dynamic-flow':
+                    apiEndpoint = '/api/visualize/dynamic-flow';
+                    requestBody = { qubits: qubits };
+                    break;
+            }
+            
+            if (!apiEndpoint) return;
+            
+            const container = document.getElementById(vizType + '-viz');
+            container.innerHTML = '<p style="text-align:center;padding:50px;">Loading...</p>';
+            
+            try {
+                const response = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const result = await response.json();
+                
+                if (result.image) {
+                    container.innerHTML = `<img src="${result.image}" style="width:100%;max-width:800px;display:block;margin:0 auto;">`;
+                    container.dataset.rendered = true;
+                } else if (result.error) {
+                    container.innerHTML = `<div class="error">${result.error}</div>`;
+                }
+            } catch (e) {
+                container.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+        
+        async function uploadFile() {
+            const fileInput = document.getElementById('file-upload');
+            const statusSpan = document.getElementById('upload-status');
+            
+            if (!fileInput.files.length) {
+                statusSpan.textContent = 'Please select a file';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            statusSpan.textContent = 'Uploading...';
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    statusSpan.textContent = 'Error: ' + result.error;
+                    return;
+                }
+                
+                statusSpan.textContent = 'File uploaded successfully!';
+                
+                // Preview file content
+                if (result.preview) {
+                    document.getElementById('file-preview').innerHTML = `
+                        <div class="info-box">
+                            <h4>File Preview: ${file.name}</h4>
+                            <pre>${JSON.stringify(result.preview, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+                
+                // If it's a state vector file, visualize it
+                if (result.state_vector) {
+                    // Switch to Bloch tab and render
+                    showTab({currentTarget: document.querySelector('.tab')}, 'bloch');
+                    // Call visualize API with uploaded data
+                    const vizResponse = await fetch('/api/visualize', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            qubits: result.qubits,
+                            stages: [{"name": "Uploaded State", "state": result.state_vector}]
+                        })
+                    });
+                    
+                    const vizResult = await vizResponse.json();
+                    if (vizResult.bloch_plot) {
+                        Plotly.newPlot('bloch-viz', vizResult.bloch_plot.data, vizResult.bloch_plot.layout);
+                    }
+                    if (vizResult.probability_plot) {
+                        Plotly.newPlot('prob-viz', vizResult.probability_plot.data, vizResult.probability_plot.layout);
+                    }
+                }
+                
+            } catch (e) {
+                statusSpan.textContent = 'Upload failed: ' + e.message;
+            }
         }
         
         function runOnHardware() {
@@ -389,16 +561,14 @@
                         <li>Enter your token in the input field above</li>
                         <li>Select a backend and number of shots</li>
                     </ol>
-                    <p>Alternatively, run the backend server with Qiskit installed:</p>
-                    <pre>cd dashboard/api && pip install -r requirements.txt && python main.py</pre>
+                    <p>Alternatively, install quantumviz with all dependencies:</p>
+                    <pre>pip install quantumviz[all]</pre>
                 </div>
             `;
         }
         
-        Math.angle = function(c) {
-            return Math.atan2(c.im || 0, c.re || 0);
-        };
-        
+        // Initialize
+        generateBasisCheckboxes();
         updateVisualization();
     </script>
 </body>

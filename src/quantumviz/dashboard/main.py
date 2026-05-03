@@ -8,15 +8,16 @@ states and running circuits on quantum hardware.
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="Quantum Viz Dashboard", version="0.2.0")
+app = FastAPI(title="Quantum Viz Dashboard", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,13 +27,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
-os.makedirs(RESULTS_DIR, exist_ok=True)
+RESULTS_DIR = Path(__file__).parent / "results"
+RESULTS_DIR.mkdir(exist_ok=True)
+
+FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
 class StateVectorInput(BaseModel):
     qubits: int = Field(ge=1, le=10, description="Number of qubits")
-    stages: List[Dict[str, Any]] = Field(description="Algorithm stages with state vectors")
+    stages: Optional[List[Dict[str, Any]]] = Field(default=None, description="Algorithm stages with state vectors")
+    algorithm: Optional[str] = Field(default=None, description="Algorithm name for parameterized generation")
+    params: Optional[Dict[str, Any]] = Field(default={}, description="Algorithm parameters")
 
 
 class BlochSphereInput(BaseModel):
@@ -110,8 +115,6 @@ def bloch_to_plotly(vector: Dict[str, float], title: str = "") -> Dict[str, Any]
 def density_to_plotly(dm_data: Dict, title: str = "") -> Dict[str, Any]:
     """Convert density matrix data to Plotly format."""
     dim = dm_data["dimensions"]
-    x = list(range(dim))
-    y = list(range(dim))
     probs = dm_data["probabilities"]
     basis_labels = [f"|{i:0{int(np.log2(dim))}b}>" for i in range(dim)]
 
@@ -130,199 +133,182 @@ def density_to_plotly(dm_data: Dict, title: str = "") -> Dict[str, Any]:
     }
 
 
+def compute_algorithm_stages(algorithm: str, qubits: int, params: Dict) -> List[Dict]:
+    """Compute algorithm stages based on parameters."""
+    if algorithm == "grover":
+        return compute_grover_stages(qubits, params)
+    elif algorithm == "qaoa":
+        return compute_qaoa_stages(qubits, params)
+    elif algorithm == "qft":
+        return compute_qft_stages(qubits, params)
+    elif algorithm == "vqe":
+        return compute_vqe_stages(qubits, params)
+    return []
+
+
+def compute_grover_stages(qubits: int, params: Dict) -> List[Dict]:
+    """Compute Grover's algorithm stages."""
+    good_states = params.get("good_states", ["11"])
+    init_state = params.get("init_state", "zero")
+
+    stages = []
+    dim = 2 ** qubits
+
+    # Initial state
+    if init_state == "zero":
+        state = [1] + [0] * (dim - 1)
+        stages.append({"name": f"|{'0'*qubits}⟩ Initial", "state": state})
+    else:  # superposition
+        amp = 1 / np.sqrt(dim)
+        state = [amp] * dim
+        stages.append({"name": "After H (Superposition)", "state": state})
+
+    # After Hadamards (if not already superposition)
+    if init_state == "zero":
+        amp = 1 / np.sqrt(dim)
+        state = [amp] * dim
+        stages.append({"name": "After H (Superposition)", "state": state})
+
+    # Oracle (mark good states)
+    for i in range(len(state)):
+        bitstring = format(i, f'0{qubits}b')
+        if bitstring in good_states:
+            state[i] = -state[i]
+    stages.append({"name": f"After Oracle (Mark {good_states})", "state": state})
+
+    # Diffusion
+    avg = np.mean(state)
+    state = [2*avg - s for s in state]
+    stages.append({"name": "After Diffusion", "state": state})
+
+    return stages
+
+
+def compute_qaoa_stages(qubits: int, params: Dict) -> List[Dict]:
+    """Compute QAOA stages."""
+    p = params.get("p", 1)
+    graph_edges = params.get("graph", [(0,1), (1,2), (2,0)])
+
+    # Initial superposition
+    dim = 2 ** qubits
+    amp = 1 / np.sqrt(dim)
+    state = [amp] * dim
+
+    stages = [{"name": "Initial (Uniform)", "state": state}]
+
+    # Simulate p layers
+    for layer in range(p):
+        gamma = 0.5 * (layer + 1)
+        beta = 0.3 * (layer + 1)
+
+        # Apply cost Hamiltonian (simplified)
+        for i in range(len(state)):
+            bitstring = format(i, f'0{qubits}b')
+            # Simple cost: count edges where both bits are 1
+            cost = 0
+            for (u, v) in graph_edges:
+                if bitstring[u] == '1' and bitstring[v] == '1':
+                    cost += 1
+            state[i] *= np.exp(-1j * gamma * cost)
+
+        # Apply mixer Hamiltonian (simplified - RX rotations)
+        # For simplicity, just adjust amplitudes
+        state = [s * np.exp(-1j * beta) for s in state]
+
+        # Normalize
+        norm = np.sqrt(sum([abs(s)**2 for s in state]))
+        state = [s / norm for s in state]
+
+        stages.append({"name": f"p={layer+1}, γ={gamma:.1f}, β={beta:.1f}", "state": state})
+
+    return stages
+
+
+def compute_qft_stages(qubits: int, params: Dict) -> List[Dict]:
+    """Compute QFT stages."""
+    dim = 2 ** qubits
+
+    # Initial |01...> state
+    state = [0] * dim
+    state[1] = 1  # |01...⟩
+    stages = [{"name": f"|{1:0{qubits}b}⟩ Input", "state": state}]
+
+    # Apply QFT (simplified - just transform)
+    # Real QFT would apply Hadamard + controlled phase rotations
+    # For visualization, we create a simple Fourier-like state
+    state = []
+    for k in range(dim):
+        amplitude = 0
+        for n in range(dim):
+            theta = 2 * np.pi * k * n / dim
+            amplitude += np.exp(1j * theta) / np.sqrt(dim)
+        state.append(amplitude)
+
+    stages.append({"name": "After QFT", "state": state})
+    return stages
+
+
+def compute_vqe_stages(qubits: int, params: Dict) -> List[Dict]:
+    """Compute VQE stages."""
+    params.get("ansatz", "ry")  # Reserved for future use
+    layers = params.get("layers", 1)
+
+    # Initial state |00...0⟩
+    dim = 2 ** qubits
+    state = [1] + [0] * (dim - 1)
+    stages = [{"name": "Initial", "state": state}]
+
+    # Apply ansatz layers
+    for layer in range(layers):
+        theta = 0.5 * (layer + 1)
+
+        # RY ansatz (simplified)
+        # Apply RY rotation to first qubit
+        if qubits >= 1:
+            new_state = []
+            for i in range(dim):
+                bitstring = format(i, f'0{qubits}b')
+                if bitstring[0] == '0':
+                    new_state.append(np.cos(theta/2))
+                    new_state.append(np.sin(theta/2))
+                    break
+                else:
+                    new_state.append(-np.sin(theta/2))
+                    new_state.append(np.cos(theta/2))
+                    break
+            # Pad or trim to correct dimension
+            while len(new_state) < dim:
+                new_state.append(0)
+            state = new_state[:dim]
+
+        stages.append({"name": f"θ={theta:.2f}", "state": state})
+
+    return stages
+
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Serve the main dashboard HTML page."""
-    return """
-    <html>
-    <head>
-        <title>Quantum Viz Dashboard</title>
-        <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-            .container { max-width: 1200px; margin: 0 auto; }
-            h1 { color: #333; text-align: center; }
-            .card { background: white; padding: 20px; margin: 20px 0; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-            .visualization { margin: 20px 0; }
-            button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
-            button:hover { background: #45a049; }
-            select, input { padding: 10px; margin: 5px; border-radius: 5px; border: 1px solid #ddd; }
-            .info { background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 10px 0; }
-            .success { background: #c8e6c9; }
-            .error { background: #ffcdd2; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Quantum Viz Dashboard</h1>
-            
-            <div class="card">
-                <h2>Algorithm Selection</h2>
-                <select id="algorithm" onchange="updateStages()">
-                    <option value="grover">Grover's Search</option>
-                    <option value="qft">Quantum Fourier Transform</option>
-                    <option value="qaoa">QAOA</option>
-                    <option value="vqe">VQE</option>
-                    <option value="custom">Custom Input</option>
-                </select>
-                <select id="qubits">
-                    <option value="2">2 Qubits</option>
-                    <option value="3">3 Qubits</option>
-                    <option value="4">4 Qubits</option>
-                </select>
-                <button onclick="loadAlgorithm()">Load Algorithm</button>
-            </div>
-            
-            <div class="card">
-                <h2>Visualizations</h2>
-                <div id="bloch-container" class="visualization"></div>
-                <div id="density-container" class="visualization"></div>
-                <div id="prob-container" class="visualization"></div>
-            </div>
-            
-            <div class="card">
-                <h2>Run on Hardware</h2>
-                <div class="info">
-                    <p>To run on real quantum hardware, you need an IBM Quantum API token.</p>
-                </div>
-                <input type="text" id="api-token" placeholder="Enter IBM Quantum API Token (optional)" style="width: 300px;">
-                <select id="backend">
-                    <option value="ibmq_qasm_simulator">QASM Simulator</option>
-                    <option value="ibmq_quito">ibmq_quito (5 qubits)</option>
-                    <option value="ibmq_bogota">ibmq_bogota (5 qubits)</option>
-                </select>
-                <input type="number" id="shots" value="1024" min="100" max="100000">
-                <button onclick="runOnHardware()">Run on Hardware</button>
-                <div id="hardware-results"></div>
-            </div>
-            
-            <div class="card">
-                <h2>Custom State Vector</h2>
-                <textarea id="custom-state" rows="3" cols="50" placeholder="[1, 0, 0, 0] or [[1,0], [0.707,0.707]]"></textarea>
-                <br>
-                <button onclick="visualizeCustom()">Visualize</button>
-            </div>
-        </div>
-        
-        <script>
-            const apiBase = "/api";
-            let currentData = null;
-            
-            const algorithmStages = {
-                grover: {
-                    2: [{"name": "|00>", "state": [1, 0, 0, 0]}, {"name": "After H", "state": [0.5, 0.5, 0.5, 0.5]},
-                        {"name": "After Oracle", "state": [0.5, 0.5, 0.5, -0.5]}, {"name": "After Diffusion", "state": [0, 0, 0, 1]}]},
-                    3: [{"name": "|000>", "state": [1, 0, 0, 0, 0, 0, 0, 0]}, {"name": "After H", "state": [0.354, 0.354, 0.354, 0.354, 0.354, 0.354, 0.354, 0.354]},
-                        {"name": "After Oracle", "state": [0.354, 0.354, 0.354, 0.354, 0.354, 0.354, 0.354, -0.354]}, {"name": "After Diffusion", "state": [0, 0, 0, 0, 0, 0, 0, 1]}]}
-                },
-                qft: {
-                    2: [{"name": "|01>", "state": [0, 1, 0, 0]}, {"name": "After QFT", "state": [0.5, 0.5j, -0.5, -0.5j]}],
-                    3: [{"name": "|001>", "state": [0, 0, 1, 0, 0, 0, 0, 0]}, {"name": "After QFT", "state": [0.354, 0.25+0.25j, 0.354j, -0.25+0.25j, -0.354, -0.25-0.25j, -0.354j, 0.25-0.25j]}]
-                },
-                qaoa: {
-                    2: [{"name": "Initial", "state": [0.5, 0.5, 0.5, 0.5]}, {"name": "p=1 iter 1", "state": [0.4, 0.4, 0.6, 0.6]}, {"name": "p=1 iter 2", "state": [0.2, 0.2, 0.8, 0.8]}],
-                    3: [{"name": "Initial", "state": [0.354, 0.354, 0.354, 0.354, 0.354, 0.354, 0.354, 0.354]}, {"name": "p=1", "state": [0.3, 0.3, 0.4, 0.4, 0.5, 0.5, 0.6, 0.6]}]
-                }
-            };
-            
-            async function loadAlgorithm() {
-                const algo = document.getElementById("algorithm").value;
-                const qubits = parseInt(document.getElementById("qubits").value);
-                
-                let stages;
-                if (algo === "custom") {
-                    const input = document.getElementById("custom-state").value;
-                    try {
-                        stages = [{"name": "Custom", "state": JSON.parse(input)}];
-                    } catch (e) {
-                        alert("Invalid JSON input");
-                        return;
-                    }
-                } else {
-                    stages = algorithmStages[algo]?.[qubits] || algorithmStages.grover[2];
-                }
-                
-                currentData = { qubits, stages };
-                await visualizeData(currentData);
-            }
-            
-            async function visualizeData(data) {
-                const response = await fetch(`${apiBase}/visualize`, {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify(data)
-                });
-                const result = await response.json();
-                
-                if (result.bloch_plot) {
-                    Plotly.newPlot("bloch-container", result.bloch_plot.data, result.bloch_plot.layout);
-                }
-                if (result.density_plot) {
-                    Plotly.newPlot("density-container", result.density_plot.data, result.density_plot.layout);
-                }
-                if (result.probability_plot) {
-                    Plotly.newPlot("prob-container", result.probability_plot.data, result.probability_plot.layout);
-                }
-            }
-            
-            async function visualizeCustom() {
-                document.getElementById("algorithm").value = "custom";
-                await loadAlgorithm();
-            }
-            
-            async function runOnHardware() {
-                const token = document.getElementById("api-token").value;
-                const backend = document.getElementById("backend").value;
-                const shots = parseInt(document.getElementById("shots").value);
-                
-                const container = document.getElementById("hardware-results");
-                container.innerHTML = '<div class="info">Running on hardware...</div>';
-                
-                try {
-                    const response = await fetch(`${apiBase}/run-hardware`, {
-                        method: "POST",
-                        headers: {"Content-Type": "application/json"},
-                        body: JSON.stringify({
-                            token: token || null,
-                            backend: backend,
-                            shots: shots,
-                            state_vector: currentData?.stages?.[0]?.state || [1, 0, 0, 0]
-                        })
-                    });
-                    const result = await response.json();
-                    
-                    if (result.error) {
-                        container.innerHTML = `<div class="error">${result.error}</div>`;
-                    } else {
-                        container.innerHTML = `
-                            <div class="success">
-                                <h4>Results from ${result.backend}</h4>
-                                <pre>${JSON.stringify(result.counts, null, 2)}</pre>
-                            </div>
-                        `;
-                    }
-                } catch (e) {
-                    container.innerHTML = `<div class="error">Error: ${e.message}</div>`;
-                }
-            }
-            
-            function updateStages() {
-                console.log("Algorithm updated");
-            }
-            
-            loadAlgorithm();
-        </script>
-    </body>
-    </html>
-    """
+    index_file = FRONTEND_DIR / "index.html"
+    if index_file.exists():
+        return HTMLResponse(content=index_file.read_text(), status_code=200)
+    return HTMLResponse(content="<h1>Frontend not found</h1>", status_code=404)
 
 
 @app.post("/api/visualize")
 async def visualize(data: StateVectorInput):
     """Visualize quantum state."""
     try:
+        # If algorithm specified with params, compute stages
+        if data.algorithm and data.params:
+            stages = compute_algorithm_stages(data.algorithm, data.qubits, data.params)
+        elif data.stages:
+            stages = data.stages
+        else:
+            return {"error": "Provide either stages or algorithm with params"}
+
         dim = 2 ** data.qubits
-        last_stage = data.stages[-1] if data.stages else None
+        last_stage = stages[-1] if stages else None
 
         if not last_stage:
             return {"error": "No stages provided"}
@@ -340,7 +326,6 @@ async def visualize(data: StateVectorInput):
         return {
             "bloch_plot": bloch_plot,
             "density_plot": density_plot,
-            "probability_plot": density_plot,
             "state_vector": state,
             "bloch_vector": bloch_vec
         }
@@ -356,8 +341,16 @@ async def run_on_hardware(config: HardwareConfig):
         from qiskit_ibm_runtime import QiskitRuntimeService, Sampler
 
         qc = QuantumCircuit(config.qubits)
-        for i in range(config.qubits):
-            qc.h(i)
+
+        # Use state_vector if provided, otherwise default to Hadamard
+        if config.state_vector:
+            from qiskit.quantum_info import Statevector
+            state = [complex(x) for x in config.state_vector]
+            sv = Statevector(state)
+            qc.initialize(sv, range(config.qubits))
+        else:
+            for i in range(config.qubits):
+                qc.h(i)
 
         service = QiskitRuntimeService(token=config.token) if config.token else None
         backend = service.backend(config.backend) if service else None
@@ -398,16 +391,264 @@ async def list_backends():
             service = QiskitRuntimeService()
             backends = service.backends()
             return {"backends": [{"name": b.name, "num_qubits": b.num_qubits} for b in backends if b.num_qubits <= 10]}
-        except:
+        except Exception:
             return {"backends": [], "message": "No credentials configured"}
     except ImportError:
         return {"backends": [], "error": "Qiskit not installed"}
 
 
+@app.post("/api/visualize/dcn")
+async def visualize_dcn(data: StateVectorInput):
+    """Generate DCN visualization."""
+    try:
+        import base64
+        import tempfile
+
+        from quantumviz.dcn import plot_dcn
+
+        dim = 2 ** data.qubits
+        last_stage = data.stages[-1] if data.stages else None
+
+        if not last_stage:
+            return {"error": "No stages provided"}
+
+        state = last_stage.get("state_vector", last_stage.get("state", [1, 0]))
+        if len(state) != dim:
+            state = [1] + [0] * (dim - 1)
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            plot_dcn(state, tmp.name)
+            tmp.seek(0)
+            img_data = base64.b64encode(open(tmp.name, "rb").read()).decode()
+            import os
+            os.unlink(tmp.name)
+
+        return {"image": f"data:image/png;base64,{img_data}"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/visualize/state-city")
+async def visualize_state_city(data: StateVectorInput):
+    """Generate State City visualization."""
+    try:
+        import base64
+        import tempfile
+
+        from quantumviz.state_city import plot_state_city
+
+        dim = 2 ** data.qubits
+        last_stage = data.stages[-1] if data.stages else None
+
+        if not last_stage:
+            return {"error": "No stages provided"}
+
+        state = last_stage.get("state_vector", last_stage.get("state", [1, 0]))
+        if len(state) != dim:
+            state = [1] + [0] * (dim - 1)
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            plot_state_city(state, tmp.name)
+            tmp.seek(0)
+            img_data = base64.b64encode(open(tmp.name, "rb").read()).decode()
+            import os
+            os.unlink(tmp.name)
+
+        return {"image": f"data:image/png;base64,{img_data}"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/visualize/circuit")
+async def visualize_circuit(data: CircuitInput):
+    """Generate Circuit Diagram visualization."""
+    try:
+        import base64
+        import tempfile
+
+        from quantumviz.circuit_diagram import plot_circuit
+
+        circuit_data = {
+            "qubits": data.qubits,
+            "gates": data.gates,
+            "name": data.name
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            plot_circuit(circuit_data, tmp.name)
+            tmp.seek(0)
+            img_data = base64.b64encode(open(tmp.name, "rb").read()).decode()
+            import os
+            os.unlink(tmp.name)
+
+        return {"image": f"data:image/png;base64,{img_data}"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.get("/api/health")
 async def health():
     """Health check endpoint."""
-    return {"status": "healthy", "version": "0.2.0"}
+    return {"status": "healthy", "version": "0.3.0"}
+
+
+@app.post("/api/visualize/cost-landscape")
+async def visualize_cost_landscape(data: dict):
+    """Generate Cost Landscape visualization for QAOA or VQE."""
+    try:
+        import base64
+        import tempfile
+
+        from quantumviz.cost_landscape import plot_qaoa_landscape, plot_vqe_landscape
+
+        algorithm = data.get("algorithm", "qaoa")
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            if algorithm == "qaoa":
+                # Generate sample QAOA landscape
+                edges = [(0, 1), (1, 2), (0, 2)]  # Sample 3-node graph
+                plot_qaoa_landscape(edges, (0, np.pi), (0, np.pi), 50, tmp.name)
+            else:  # vqe
+                # Generate sample VQE landscape
+                terms = [
+                    {"coeff": -1.0, "paulis": []},
+                    {"coeff": 0.5, "paulis": ["Z"]},
+                    {"coeff": 0.25, "paulis": ["Z", "Z"]}
+                ]
+                plot_vqe_landscape(terms, (0, 2*np.pi), 100, tmp.name)
+
+            tmp.seek(0)
+            img_data = base64.b64encode(open(tmp.name, "rb").read()).decode()
+            import os
+            os.unlink(tmp.name)
+
+        return {"image": f"data:image/png;base64,{img_data}"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/visualize/dynamic-flow")
+async def visualize_dynamic_flow(data: dict):
+    """Generate Dynamic Flow visualization."""
+    try:
+        import base64
+        import tempfile
+
+        from quantumviz.dynamic_flow import plot_dynamic_flow
+
+        # Generate sample time evolution data
+        time_steps = 50
+        states = []
+        for t in range(time_steps):
+            # Simple Rabi oscillation
+            theta = t * 3.14159 / time_steps
+            state = [complex(np.cos(theta/2), 0), complex(0, np.sin(theta/2))]
+            states.append(state)
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            plot_dynamic_flow(states, tmp.name)
+            tmp.seek(0)
+            img_data = base64.b64encode(open(tmp.name, "rb").read()).decode()
+            import os
+            os.unlink(tmp.name)
+
+        return {"image": f"data:image/png;base64,{img_data}"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload and parse quantum state files (JSON, QPY, TXT)."""
+    try:
+        content = await file.read()
+        filename = file.filename or "unknown"
+
+        if filename.endswith('.json'):
+            # Parse JSON file
+            data = json.loads(content.decode('utf-8'))
+            # Extract state vector from various JSON formats
+            if 'stages' in data:
+                state = data['stages'][-1].get('state', data['stages'][-1].get('state_vector', []))
+            elif 'state_vector' in data:
+                state = data['state_vector']
+            elif 'amplitudes' in data:
+                state = data['amplitudes']
+            else:
+                # Assume the JSON itself is the state vector
+                state = data if isinstance(data, list) else []
+
+            if not state:
+                return {"error": "No state vector found in JSON file"}
+
+            # Parse complex numbers
+            state = [complex(s) if not isinstance(s, complex) else s for s in state]
+            qubits = int(np.log2(len(state)))
+
+            return {
+                "qubits": qubits,
+                "state_vector": [{"re": float(np.real(s)), "im": float(np.imag(s))} for s in state],
+                "preview": {"qubits": qubits, "num_amplitudes": len(state), "format": "json"}
+            }
+
+        elif filename.endswith('.qpy'):
+            # Parse Qiskit QPY file
+            try:
+                import io
+
+                from qiskit import QuantumCircuit
+                from qiskit.quantum_info import Statevector
+
+                qc = QuantumCircuit.from_qpy(io.BytesIO(content))[0]
+                state = Statevector(qc).data.tolist()
+                qubits = qc.num_qubits
+
+                return {
+                    "qubits": qubits,
+                    "state_vector": [{"re": float(np.real(s)), "im": float(np.imag(s))} for s in state],
+                    "preview": {"qubits": qubits, "circuit": str(qc), "format": "qpy"}
+                }
+            except ImportError:
+                return {"error": "Qiskit not installed. Install with: pip install qiskit"}
+
+        elif filename.endswith('.txt'):
+            # Parse text file (one amplitude per line)
+            lines = content.decode('utf-8').strip().split('\n')
+            state = []
+            for line in lines:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    # Try to parse as complex number
+                    try:
+                        # Handle formats like "0.707+0.707j" or "[0.707, 0.707]"
+                        line = line.strip('[]').strip()
+                        if ',' in line:
+                            # Assume it's a list [re, im]
+                            parts = line.split(',')
+                            re = float(parts[0].strip())
+                            im = float(parts[1].strip().replace('j', ''))
+                            state.append(complex(re, im))
+                        else:
+                            # Try to eval as complex
+                            state.append(complex(line.replace('j', 'j')))
+                    except Exception:
+                        return {"error": f"Cannot parse line: {line}"}
+
+            if not state:
+                return {"error": "No valid amplitudes found in TXT file"}
+
+            qubits = int(np.log2(len(state)))
+            return {
+                "qubits": qubits,
+                "state_vector": [{"re": float(np.real(s)), "im": float(np.imag(s))} for s in state],
+                "preview": {"qubits": qubits, "num_amplitudes": len(state), "format": "txt"}
+            }
+
+        else:
+            return {"error": "Unsupported file format. Use .json, .qpy, or .txt files."}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
 if __name__ == "__main__":

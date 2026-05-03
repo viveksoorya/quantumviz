@@ -24,7 +24,7 @@ class TestHealthEndpoint:
 
     def test_health_has_version(self):
         response = client.get("/api/health")
-        assert "0.2.0" in response.json()["version"]
+        assert "0.3.0" in response.json()["version"]
 
 
 class TestVisualizeEndpoint:
@@ -37,7 +37,7 @@ class TestVisualizeEndpoint:
         data = response.json()
         assert "bloch_plot" in data
         assert "density_plot" in data
-        assert "probability_plot" in data
+        assert "state_vector" in data
 
     def test_visualize_state_0(self):
         response = client.post("/api/visualize", json={
@@ -174,7 +174,7 @@ class TestRootEndpoint:
 
     def test_root_contains_dashboard_title(self):
         response = client.get("/")
-        assert "Quantum Viz Dashboard" in response.text
+        assert "Quantum Algorithm Visualization Dashboard" in response.text
 
     def test_root_includes_plotly(self):
         response = client.get("/")
