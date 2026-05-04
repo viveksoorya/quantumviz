@@ -44,7 +44,7 @@ def parse_amplitude(amp: Any) -> complex:
         raise ValueError(f"Unsupported amplitude format: {amp}")
 
 
-def state_to_density(state_vector: List[complex]) -> np.ndarray:
+def state_to_density(state_vector: List[complex]) -> "np.ndarray[Any, Any]":
     """
     Convert a state vector (list of complex numbers) to a density matrix.
 
@@ -63,7 +63,7 @@ def state_to_density(state_vector: List[complex]) -> np.ndarray:
         raise ValueError("State vector cannot be empty")
 
     psi = np.array(state_vector, dtype=complex).reshape(-1, 1)
-    return psi @ psi.conj().T
+    return (psi @ psi.conj().T)  # type: ignore[no-any-return]
 
 
 def plot_state_city(
@@ -149,6 +149,55 @@ def plot_state_city(
         return fig
 
 
+def plot_state_cities(
+    states: List[List[complex]],
+    titles: Optional[List[str]] = None,
+    output_dir: str = "./",
+    base_filename: str = "state_city",
+    dpi: int = 150,
+    fmt: str = "png"
+) -> List[str]:
+    """
+    Plot multiple state cities from an array of states.
+
+    Args:
+        states: List of state vectors (each a list of complex amplitudes)
+        titles: Optional list of titles for each plot
+        output_dir: Directory to save output files
+        base_filename: Base name for output files
+        dpi: Resolution for saved figures
+        fmt: Output format (png, pdf, svg)
+
+    Returns:
+        List of output filenames
+    """
+    if not states:
+        raise ValueError("States list cannot be empty")
+
+    if titles is None:
+        titles = [f"State {i+1}" for i in range(len(states))]
+
+    if len(titles) < len(states):
+        raise ValueError("Not enough titles for all states")
+
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    output_files = []
+
+    for i, state in enumerate(states):
+        if output_dir:
+            filename = f"{output_dir}/{base_filename}_{i+1:02d}_{titles[i].replace(' ', '_')}.{fmt}"
+        else:
+            filename = f"{base_filename}_{i+1:02d}_{titles[i].replace(' ', '_')}.{fmt}"
+
+        plot_state_city(state, titles[i], filename, dpi)
+        output_files.append(filename)
+        print(f"Saved: {filename}")
+
+    return output_files
+
+
 def plot_state_cities_from_file(
     input_file: str,
     output_dir: Optional[str] = None,
@@ -158,8 +207,13 @@ def plot_state_cities_from_file(
     """
     Plot multiple stages from a JSON input file.
 
+    Supports three formats:
+    1. {"states": [[...], [...], ...]} - array of state vectors
+    2. {"state_vector": [...]} - single state vector
+    3. {"stages": [{"name": "...", "state_vector": [...]}, ...]} - named stages
+
     Args:
-        input_file: Path to JSON file with stages
+        input_file: Path to JSON file
         output_dir: Directory to save output files (if None, uses current dir)
         dpi: Resolution for saved figures
         fmt: Output format (png, pdf, svg)
@@ -170,41 +224,71 @@ def plot_state_cities_from_file(
     with open(input_file, 'r') as f:
         data = json.load(f)
 
-    n_qubits = data['qubits']
-    dim = 2 ** n_qubits
-    stages = data['stages']
-
-    output_files = []
-
-    # Create output directory if it doesn't exist
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    for i, stage in enumerate(stages):
-        name = stage.get('name', f'Stage {i+1}')
-        raw_state = stage['state_vector']
+    # Format 1: Array of states
+    if 'states' in data:
+        states = data['states']
+        if not isinstance(states, list):
+            raise ValueError("'states' must be a list of state vectors")
 
-        # Handle Qiskit Statevector objects
-        from quantumviz.qiskit_bridge import is_statevector, statevector_to_list
-        if is_statevector(raw_state):
-            state_vector = statevector_to_list(raw_state)
-        else:
-            state_vector = [parse_amplitude(amp) for amp in raw_state]
+        parsed_states = []
+        for state in states:
+            parsed_state = [parse_amplitude(amp) for amp in state]
+            parsed_states.append(parsed_state)
 
-        if len(state_vector) != dim:
-            raise ValueError(f"Stage '{name}': state vector length {len(state_vector)} "
-                           f"does not match 2^{n_qubits}={dim}")
+        base_name = os.path.splitext(os.path.basename(input_file))[0]
+        return plot_state_cities(parsed_states, None, output_dir or './', base_name, dpi, fmt)
+
+    # Format 2: Single state vector
+    elif 'state_vector' in data:
+        state_vector = [parse_amplitude(amp) for amp in data['state_vector']]
+        name = data.get('name', 'State')
 
         if output_dir:
-            filename = f"{output_dir}/stage_{i+1:02d}_{name.replace(' ', '_')}.{fmt}"
+            filename = f"{output_dir}/{name.replace(' ', '_')}.{fmt}"
         else:
-            filename = f"stage_{i+1:02d}_{name.replace(' ', '_')}.{fmt}"
+            filename = f"{name.replace(' ', '_')}.{fmt}"
 
         plot_state_city(state_vector, name, filename, dpi)
-        output_files.append(filename)
-        print(f"Saved: {filename}")
+        return [filename]
 
-    return output_files
+    # Format 3: Stages (existing format)
+    elif 'stages' in data:
+        n_qubits = data['qubits']
+        dim = 2 ** n_qubits
+        stages = data['stages']
+
+        output_files = []
+
+        for i, stage in enumerate(stages):
+            name = stage.get('name', f'Stage {i+1}')
+            raw_state = stage['state_vector']
+
+            from quantumviz.qiskit_bridge import is_statevector, statevector_to_list
+            if is_statevector(raw_state):
+                state_vector = statevector_to_list(raw_state)
+            else:
+                state_vector = [parse_amplitude(amp) for amp in raw_state]
+
+            if len(state_vector) != dim:
+                raise ValueError(f"Stage '{name}': state vector length {len(state_vector)} "
+                               f"does not match 2^{n_qubits}={dim}")
+
+            if output_dir:
+                filename = f"{output_dir}/stage_{i+1:02d}_{name.replace(' ', '_')}.{fmt}"
+            else:
+                filename = f"stage_{i+1:02d}_{name.replace(' ', '_')}.{fmt}"
+
+            plot_state_city(state_vector, name, filename, dpi)
+            output_files.append(filename)
+            print(f"Saved: {filename}")
+
+        return output_files
+
+    else:
+        raise ValueError("Input file must contain 'states', 'state_vector', or 'stages' key")
 
 
 def main(args: Optional[List[str]] = None) -> None:

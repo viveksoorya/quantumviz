@@ -134,71 +134,142 @@ def plot_dcn(
     # TikZ scale factor (consistent across position and axis calculations)
     scale = 0.72
 
-    # Draw each basis state's marker
-    for i, amp in enumerate(state_vector):
-        magnitude = abs(amp)
-        phase = np.angle(amp) if magnitude >= 0.01 else 0
+    # For 3-qubit: First pass - collect positions only
+    # Second pass - draw circles (after planes)
+    if n_qubits == 3:
+        # TikZ parameters (scaled for matplotlib)
+        ax_dim = 5.5 * scale   # \ax: Q1 horizontal spacing
+        ay_dim = 3.0 * scale   # \ay: Q2 vertical spacing
+        sx = 2.5 * scale      # \sx: back face horizontal shift
+        sy = 2.0 * scale      # \sy: back face vertical shift
+        circle_r_scaled = 1.0 * scale  # Circle radius
 
-        if n_qubits == 3:
+        # First pass: collect all positions
+        for i, amp in enumerate(state_vector):
+            magnitude = abs(amp)
+            phase = np.angle(amp) if magnitude >= 0.01 else 0
+
             # Extract bits using big-endian: |Q1 Q2 Q3> where Q1 is MSB
-            # i = Q1*4 + Q2*2 + Q3 (big-endian)
             q1 = (i >> 2) & 1  # MSB (horizontal, x-axis)
             q2 = (i >> 1) & 1  # Middle (vertical, y-axis)
             q3 = i & 1          # LSB (front/back face)
 
-            # TikZ parameters (scaled for matplotlib)
-            ax_dim = 5.5 * scale   # \ax: Q1 horizontal spacing
-            ay_dim = 3.0 * scale   # \ay: Q2 vertical spacing
-            sx = 2.5 * scale      # \sx: back face horizontal shift
-            sy = 2.0 * scale      # \sy: back face vertical shift
-            circle_r = 1.0 * scale  # Circle radius
-
             # Position calculation (matching TikZ exactly)
-            # TikZ: Front face (Q3=0) at (Q1*5.5, Q2*3.0), Back face (Q3=1) offset by (2.5, 2.0)
             x_pos = q1 * ax_dim + (sx if q3 else 0)
             y_pos = q2 * ay_dim + (sy if q3 else 0)
 
-            positions[i] = (x_pos, y_pos, q1, q2, q3)
+            positions[i] = (x_pos, y_pos, q1, q2, q3, magnitude, phase)
 
+        # Draw planes FIRST (behind everything)
+        # Check separability along each qubit
+        separable_q1 = is_separable_along_qubit(state_vector, 3, qubit_idx=2)
+        separable_q2 = is_separable_along_qubit(state_vector, 3, qubit_idx=1)
+        separable_q3 = is_separable_along_qubit(state_vector, 3, qubit_idx=0)
+
+        # Determine which planes to draw (at most 2, ordered by axis Q1,Q2,Q3)
+        sep_axes = [q for q in [1, 2, 3] if [separable_q1, separable_q2, separable_q3][q-1]]
+        ent_axes = [q for q in [1, 2, 3] if not [separable_q1, separable_q2, separable_q3][q-1]]
+
+        if len(sep_axes) == 3:  # Fully separable
+            planes = [(1, 'green', 'sep Q1'), (2, 'green', 'sep Q2')]
+        elif len(sep_axes) == 0:  # Fully entangled
+            planes = [(1, 'red', 'ent Q1'), (2, 'red', 'ent Q2')]
+        else:  # Mixed: 1 sep + 2 ent -> show 1 green + 1 red
+            first_sep = next(q for q in [1, 2, 3] if q in sep_axes)
+            first_ent = next(q for q in [1, 2, 3] if q in ent_axes)
+            planes = [(first_sep, 'green', f'sep Q{first_sep}'),
+                      (first_ent, 'red', f'ent Q{first_ent}')]
+
+        # Helper to generate plane points for each axis
+        def get_plane_pts(axis, m):
+            if axis == 1:  # Q1: vertical plane at x = ax_dim/2
+                x_mid = ax_dim / 2
+                return [(x_mid, -m), (x_mid, ay_dim + m),
+                        (x_mid + sx, ay_dim + sy + m), (x_mid + sx, sy - m)]
+            elif axis == 2:  # Q2: horizontal-ish plane at y = ay_dim/2
+                y_mid = ay_dim / 2
+                return [(-m, y_mid), (ax_dim + m, y_mid),
+                        (ax_dim + sx + m, y_mid + sy), (sx - m, y_mid + sy)]
+            else:  # Q3: diagonal rectangle at offset (sx/2, sy/2)
+                x_off = sx / 2
+                y_off = sy / 2
+                return [(x_off - m, y_off - m), (ax_dim + x_off + m, y_off - m),
+                        (ax_dim + x_off + m, ay_dim + y_off + m),
+                        (x_off - m, ay_dim + y_off + m)]
+
+        # Draw planes in axis order (Q1, Q2, Q3) - BEHIND other elements
+        margin_small = 0.3 * scale
+        for axis, color, label in sorted(planes, key=lambda x: x[0]):
+            pts = get_plane_pts(axis, margin_small)
+            pts.append(pts[0])  # Close polygon
+            px_vals = [p[0] for p in pts]
+            py_vals = [p[1] for p in pts]
+            ax.fill(px_vals, py_vals, color, alpha=0.2, edgecolor=color, linewidth=2,
+                   zorder=1)
+            # Position label at center of plane
+            if axis == 1:
+                label_x = ax_dim/2 + sx/2
+                label_y = (ay_dim + sy) / 2
+            elif axis == 2:
+                label_x = (ax_dim + sx) / 2
+                label_y = ay_dim/2 + sy/2
+            else:
+                label_x = sx/2 + ax_dim/2
+                label_y = sy/2 + ay_dim/2
+            ax.text(label_x, label_y, label, ha='center', va='center',
+                   fontsize=7, color=color, fontweight='bold', zorder=2)
+
+        # Second pass: draw all circles and labels (ON TOP of planes)
+        for i, (x_pos, y_pos, q1, q2, q3, magnitude, phase) in positions.items():
             # Determine if front or back face
             is_back_face = (q3 == 1)
 
             # Outer circle - always draw
-            outer_circle = MplCircle((x_pos, y_pos), circle_r, fill=False,
+            outer_circle = MplCircle((x_pos, y_pos), circle_r_scaled, fill=False,
                                      color='black', linewidth=1.5,
                                      linestyle='--' if is_back_face else '-',
-                                     alpha=0.6 if is_back_face else 1.0)
+                                     alpha=0.6 if is_back_face else 1.0,
+                                     zorder=3)
             ax.add_patch(outer_circle)
 
             # Basis state label - always draw
             basis_label = format(i, f'0{n_qubits}b')
-            ax.text(x_pos, y_pos - circle_r - 0.1, f'|{basis_label}⟩',
+            ax.text(x_pos, y_pos - circle_r_scaled - 0.1, f'|{basis_label}⟩',
                    ha='center', va='top', fontsize=8, fontweight='bold',
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8),
+                   zorder=4)
 
             # Only draw amplitude-dependent elements for non-zero states
             if magnitude >= 0.01:
                 # Inner circle (filled) - radius proportional to magnitude
-                inner_r = circle_r * magnitude
+                inner_r = circle_r_scaled * magnitude
                 if inner_r > 0.01:
-                    # Color based on Q3 (front/back face): blue for Q3=0, green for Q3=1 (matches TikZ)
+                    # Color based on Q3 (front/back face): blue for Q3=0, green for Q3=1
                     inner_color = 'skyblue' if q3 == 0 else 'lightgreen'
                     inner_circle = MplCircle((x_pos, y_pos), inner_r, fill=True,
-                                             color=inner_color, linewidth=0, alpha=0.7)
+                                             color=inner_color, linewidth=0, alpha=0.7,
+                                             zorder=3)
                     ax.add_patch(inner_circle)
 
                 # Phase line (direction = phase angle)
-                endpoint_x = x_pos + circle_r * np.cos(phase)
-                endpoint_y = y_pos + circle_r * np.sin(phase)
+                endpoint_x = x_pos + circle_r_scaled * np.cos(phase)
+                endpoint_y = y_pos + circle_r_scaled * np.sin(phase)
                 ax.plot([x_pos, endpoint_x], [y_pos, endpoint_y],
                        color='black', linewidth=2.5,
-                       alpha=0.6 if is_back_face else 1.0)
+                       alpha=0.6 if is_back_face else 1.0,
+                       zorder=3)
 
                 # Center dot
                 ax.plot(x_pos, y_pos, 'ko', markersize=3,
-                       alpha=0.6 if is_back_face else 1.0)
+                       alpha=0.6 if is_back_face else 1.0,
+                       zorder=3)
 
-        else:
+    else:
+        # 1 or 2 qubit case - draw circles in a loop
+        for i, amp in enumerate(state_vector):
+            magnitude = abs(amp)
+            phase = np.angle(amp) if magnitude >= 0.01 else 0
+
             if n_qubits == 1:
                 x = i
                 y = 0
@@ -226,7 +297,7 @@ def plot_dcn(
                     color_idx = (i >> 1) & 1
                 inner_color = qubit_cmap(color_idx * 2)
                 inner_circle = MplCircle((px, py), inner_r, fill=True, color=inner_color,
-                                        linewidth=0, alpha=0.7)
+                                         linewidth=0, alpha=0.7)
                 ax.add_patch(inner_circle)
 
             # Basis state label
@@ -268,28 +339,65 @@ def plot_dcn(
             return (center[0] + dx/dist * r, center[1] + dy/dist * r)
 
         # Check separability along each qubit
-        separable_q1 = is_separable_along_qubit(state_vector, 3, qubit_idx=2)  # Q1
+        # qubit_idx: 2=Q1/MSB, 1=Q2, 0=Q3/LSB
+        separable_q1 = is_separable_along_qubit(state_vector, 3, qubit_idx=2)
+        separable_q2 = is_separable_along_qubit(state_vector, 3, qubit_idx=1)
+        separable_q3 = is_separable_along_qubit(state_vector, 3, qubit_idx=0)
 
-        # Draw separability plane for Q1 (green parallelogram midway between Q1=0 and Q1=1)
-        if separable_q1:
-            plane_x_mid = ax_dim / 2  # Midway between Q1=0 (x=0) and Q1=1 (x=ax_dim)
-            # Use consistent scaling for all coordinates
-            margin_small = 0.3 * scale
-            plane_pts = [
-                (plane_x_mid, -margin_small),
-                (plane_x_mid, ay_dim + margin_small),
-                (plane_x_mid + sx, ay_dim + sy + margin_small),
-                (plane_x_mid + sx, sy - margin_small)
-            ]
-            plane_pts.append(plane_pts[0])  # Close polygon
-            px_vals = [p[0] for p in plane_pts]
-            py_vals = [p[1] for p in plane_pts]
-            ax.fill(px_vals, py_vals, 'green', alpha=0.2, edgecolor='green', linewidth=2)
-            ax.text(plane_x_mid + sx/2, (ay_dim + sy)/2, 'separability',
-                   ha='center', va='center', fontsize=8, color='green', fontweight='bold')
+        # Determine which planes to draw (at most 2, ordered by axis Q1,Q2,Q3)
+        sep_axes = [q for q in [1, 2, 3] if [separable_q1, separable_q2, separable_q3][q-1]]
+        ent_axes = [q for q in [1, 2, 3] if not [separable_q1, separable_q2, separable_q3][q-1]]
+
+        if len(sep_axes) == 3:  # Fully separable
+            planes = [(1, 'green', 'sep Q1'), (2, 'green', 'sep Q2')]
+        elif len(sep_axes) == 0:  # Fully entangled
+            planes = [(1, 'red', 'ent Q1'), (2, 'red', 'ent Q2')]
+        else:  # Mixed: 1 sep + 2 ent -> show 1 green + 1 red
+            first_sep = next(q for q in [1, 2, 3] if q in sep_axes)
+            first_ent = next(q for q in [1, 2, 3] if q in ent_axes)
+            planes = [(first_sep, 'green', f'sep Q{first_sep}'),
+                      (first_ent, 'red', f'ent Q{first_ent}')]
+
+        # Helper to generate plane points for each axis
+        def get_plane_pts(axis, m):
+            if axis == 1:  # Q1: vertical plane at x = ax_dim/2
+                x_mid = ax_dim / 2
+                return [(x_mid, -m), (x_mid, ay_dim + m),
+                        (x_mid + sx, ay_dim + sy + m), (x_mid + sx, sy - m)]
+            elif axis == 2:  # Q2: horizontal-ish plane at y = ay_dim/2
+                y_mid = ay_dim / 2
+                return [(-m, y_mid), (ax_dim + m, y_mid),
+                        (ax_dim + sx + m, y_mid + sy), (sx - m, y_mid + sy)]
+            else:  # Q3: diagonal rectangle at offset (sx/2, sy/2)
+                x_off = sx / 2
+                y_off = sy / 2
+                return [(x_off - m, y_off - m), (ax_dim + x_off + m, y_off - m),
+                        (ax_dim + x_off + m, ay_dim + y_off + m),
+                        (x_off - m, ay_dim + y_off + m)]
+
+        # Draw planes in axis order (Q1, Q2, Q3)
+        margin_small = 0.3 * scale
+        for axis, color, label in sorted(planes, key=lambda x: x[0]):
+            pts = get_plane_pts(axis, margin_small)
+            pts.append(pts[0])  # Close polygon
+            px_vals = [p[0] for p in pts]
+            py_vals = [p[1] for p in pts]
+            ax.fill(px_vals, py_vals, color, alpha=0.2, edgecolor=color, linewidth=2)
+            # Position label at center of plane
+            if axis == 1:
+                label_x = ax_dim/2 + sx/2
+                label_y = (ay_dim + sy) / 2
+            elif axis == 2:
+                label_x = (ax_dim + sx) / 2
+                label_y = ay_dim/2 + sy/2
+            else:
+                label_x = sx/2 + ax_dim/2
+                label_y = sy/2 + ay_dim/2
+            ax.text(label_x, label_y, label, ha='center', va='center',
+                   fontsize=7, color=color, fontweight='bold')
 
         # Draw connecting lines between adjacent basis states (circumference to circumference)
-        for i_curr, (x_curr, y_curr, q1, q2, q3) in positions.items():
+        for i_curr, (x_curr, y_curr, q1, q2, q3, _, _) in positions.items():
             # Along Q1 dimension (horizontal): connect if q1=0
             if q1 == 0:
                 i_next = (1 << 2) | (q2 << 1) | q3
@@ -406,43 +514,138 @@ def plot_dcn(
     return fig
 
 
+def plot_dcns(
+    states: List[List[complex]],
+    titles: Optional[List[str]] = None,
+    output_dir: str = "./",
+    base_filename: str = "dcn",
+    dpi: int = 150,
+    fmt: str = "png"
+) -> List[str]:
+    """
+    Plot multiple DCN diagrams from an array of states.
+
+    Args:
+        states: List of state vectors (each a list of complex amplitudes)
+        titles: Optional list of titles for each plot
+        output_dir: Directory to save output files
+        base_filename: Base name for output files
+        dpi: Resolution for saved figures
+        fmt: Output format (png, pdf, svg)
+
+    Returns:
+        List of output filenames
+    """
+    if not states:
+        raise ValueError("States list cannot be empty")
+
+    if titles is None:
+        titles = [f"State {i+1}" for i in range(len(states))]
+
+    if len(titles) < len(states):
+        raise ValueError("Not enough titles for all states")
+
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    output_files = []
+
+    for i, state in enumerate(states):
+        if output_dir:
+            filename = f"{output_dir}/{base_filename}_{i+1:02d}_{titles[i].replace(' ', '_')}.{fmt}"
+        else:
+            filename = f"{base_filename}_{i+1:02d}_{titles[i].replace(' ', '_')}.{fmt}"
+
+        plot_dcn(state, titles[i], filename, dpi)
+        output_files.append(filename)
+        print(f"Saved: {filename}")
+
+    return output_files
+
+
 def plot_dcns_from_file(
     input_file: str,
     output_dir: Optional[str] = None,
     dpi: int = 150,
     fmt: str = "png"
 ) -> List[str]:
-    """Plot multiple DCN stages from JSON file."""
+    """
+    Plot multiple DCN diagrams from a JSON file.
+
+    Supports three formats:
+    1. {"states": [[...], [...], ...]} - array of state vectors
+    2. {"state_vector": [...]} - single state vector
+    3. {"stages": [{"name": "...", "state_vector": [...]}, ...]} - named stages
+
+    Args:
+        input_file: Path to JSON file
+        output_dir: Directory to save output files
+        dpi: Resolution for saved figures
+        fmt: Output format (png, pdf, svg)
+
+    Returns:
+        List of output filenames
+    """
     with open(input_file, 'r') as f:
         data = json.load(f)
 
-    stages = data['stages']
-
-    if output_dir and not output_dir.endswith('/'):
-        output_dir += '/'
-    if output_dir is None:
-        output_dir = './'
-
-    # Create output directory if it doesn't exist
-    if not os.path.exists(output_dir):
+    if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    output_files = []
+    # Format 1: Array of states
+    if 'states' in data:
+        states = data['states']
+        if not isinstance(states, list):
+            raise ValueError("'states' must be a list of state vectors")
 
-    for idx, stage in enumerate(stages):
-        name = stage.get('name', f'Stage {idx+1}')
+        parsed_states = []
+        for state in states:
+            parsed_state = [parse_amplitude(amp) for amp in state]
+            parsed_states.append(parsed_state)
 
-        state_vector = []
-        for amp in stage['state_vector']:
-            state_vector.append(parse_amplitude(amp))
+        base_name = os.path.splitext(os.path.basename(input_file))[0]
+        return plot_dcns(parsed_states, None, output_dir or './', base_name, dpi, fmt)
 
-        safe_name = name.replace(' ', '_').replace('/', '_')
-        stage_num = f'stage_{idx+1:02d}'
-        output_path = f'{output_dir}{stage_num}_{safe_name}.{fmt}'
+    # Format 2: Single state vector
+    elif 'state_vector' in data:
+        state_vector = [parse_amplitude(amp) for amp in data['state_vector']]
+        name = data.get('name', 'DCN')
 
-        plot_dcn(state_vector, name, output_path, dpi)
-        output_files.append(output_path)
+        if output_dir:
+            filename = f"{output_dir}/{name.replace(' ', '_')}.{fmt}"
+        else:
+            filename = f"{name.replace(' ', '_')}.{fmt}"
 
-        print(f'Saved: {output_path}')
+        plot_dcn(state_vector, name, filename, dpi)
+        return [filename]
 
-    return output_files
+    # Format 3: Stages (existing format)
+    elif 'stages' in data:
+        stages = data['stages']
+
+        if output_dir and not output_dir.endswith('/'):
+            output_dir += '/'
+        if output_dir is None:
+            output_dir = './'
+
+        output_files = []
+
+        for idx, stage in enumerate(stages):
+            name = stage.get('name', f'Stage {idx+1}')
+
+            state_vector = []
+            for amp in stage['state_vector']:
+                state_vector.append(parse_amplitude(amp))
+
+            safe_name = name.replace(' ', '_').replace('/', '_')
+            stage_num = f'stage_{idx+1:02d}'
+            output_path = f'{output_dir}{stage_num}_{safe_name}.{fmt}'
+
+            plot_dcn(state_vector, name, output_path, dpi)
+            output_files.append(output_path)
+            print(f'Saved: {output_path}')
+
+        return output_files
+
+    else:
+        raise ValueError("Input file must contain 'states', 'state_vector', or 'stages' key")

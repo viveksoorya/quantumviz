@@ -6,6 +6,7 @@ as PNG images.
 """
 
 import json
+import os
 
 import matplotlib
 
@@ -98,8 +99,8 @@ def parse_circuit(data: Dict[str, Any]) -> List[List[Dict[str, Any]]]:
     Returns:
         List of layers, each containing a list of gates
     """
-    layers = []
-    current_layer = []
+    layers: "List[List[Dict[str, Any]]]" = []
+    current_layer: "List[Dict[str, Any]]" = []
     for gate in data['gates']:
         if gate['type'] == 'CNOT':
             if current_layer:
@@ -111,6 +112,50 @@ def parse_circuit(data: Dict[str, Any]) -> List[List[Dict[str, Any]]]:
     if current_layer:
         layers.append(current_layer)
     return layers
+
+
+def plot_circuits(
+    circuits: List[Dict[str, Any]],
+    output_dir: str = "./",
+    base_filename: str = "circuit",
+    dpi: int = 150,
+    fmt: str = "png"
+) -> List[str]:
+    """
+    Plot multiple quantum circuit diagrams from an array of circuit dicts.
+
+    Args:
+        circuits: List of circuit dictionaries with 'qubits', 'gates', 'name'
+        output_dir: Directory to save output files
+        base_filename: Base name for output files
+        dpi: Resolution for saved figures
+        fmt: Output format (png, pdf, svg)
+
+    Returns:
+        List of output filenames
+    """
+    if not circuits:
+        raise ValueError("Circuits list cannot be empty")
+
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    output_files = []
+
+    for i, circuit in enumerate(circuits):
+        name = circuit.get('name', f'Circuit {i+1}')
+        safe_name = name.replace(' ', '_').replace('/', '_')
+
+        if output_dir:
+            filename = f"{output_dir}/{base_filename}_{i+1:02d}_{safe_name}.{fmt}"
+        else:
+            filename = f"{base_filename}_{i+1:02d}_{safe_name}.{fmt}"
+
+        plot_circuit(circuit, filename, dpi)
+        output_files.append(filename)
+        print(f"Saved: {filename}")
+
+    return output_files
 
 
 def plot_circuit(data: Union[Dict[str, Any], Any], output_path: Optional[str] = None, dpi: int = 150) -> plt.Figure:

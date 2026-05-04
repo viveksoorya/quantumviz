@@ -40,8 +40,7 @@ quantumviz serve                               # Dashboard at localhost:8000 (we
 
 ## Dependencies
 
-- **click**: Used by CLI (`src/quantumviz/cli.py`) but missing from `pyproject.toml` dependencies. Install manually: `pip install click`
-- CI installs it explicitly: `pip install pytest pytest-cov pytest-mock click`
+All dependencies are in `pyproject.toml` (click is included).
 
 ## Conventions
 

@@ -6,6 +6,10 @@ Bloch spheres, density matrices, cost landscapes, and circuit diagrams.
 """
 
 from quantumviz._version import __version__
+from quantumviz.bloch_multivector import (
+    plot_bloch_multivector,
+    plot_bloch_multivectors_from_file,
+)
 from quantumviz.bloch_sphere import (
     parse_angles,
     parse_bloch_vector,
@@ -34,10 +38,22 @@ from quantumviz.dynamic_flow import (
     plot_rabi_oscillation,
     plot_time_evolution,
 )
+from quantumviz.hinton import (
+    plot_hinton,
+    plot_hintons_from_file,
+)
+from quantumviz.paulivec import (
+    plot_paulivec,
+    plot_paulivecs_from_file,
+)
 from quantumviz.state_city import (
     parse_amplitude,
     plot_state_city,
     state_to_density,
+)
+from quantumviz.qbeads import (
+    plot_qbeads,
+    plot_qbeads_from_file,
 )
 
 __all__ = [
@@ -61,6 +77,14 @@ __all__ = [
     "plot_time_evolution",
     "plot_dcn",
     "plot_dcns_from_file",
+    "plot_paulivec",
+    "plot_paulivecs_from_file",
+    "plot_bloch_multivector",
+    "plot_bloch_multivectors_from_file",
+    "plot_hinton",
+    "plot_hintons_from_file",
+    "plot_qbeads",
+    "plot_qbeads_from_file",
 ]
 
 # Qiskit bridge (optional, requires qiskit installed)
