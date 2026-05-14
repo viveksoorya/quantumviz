@@ -50,9 +50,10 @@ def is_separable_along_qubit(state_vector: List[complex], n_qubits: int, qubit_i
 
     # Find reference non-zero group
     ref = None
+    ref_norm = 0.0
     for key, amps in groups.items():
-        norm = np.linalg.norm(amps)
-        if norm > 1e-9:
+        ref_norm = float(np.linalg.norm(amps))
+        if ref_norm > 1e-9:
             ref = np.array(amps)
             break
 
@@ -65,13 +66,10 @@ def is_separable_along_qubit(state_vector: List[complex], n_qubits: int, qubit_i
         curr_norm = np.linalg.norm(curr)
         if curr_norm < 1e-9:
             continue
-        # Find scalar: use first non-zero element of ref
-        for j in range(2):
-            if abs(ref[j]) > 1e-9:
-                scalar = curr[j] / ref[j]
-                if not np.allclose(curr, scalar * ref, atol=1e-9):
-                    return False
-                break
+        # Two 2-vectors are scalar multiples iff determinant is zero
+        det = curr[0]*ref[1] - curr[1]*ref[0]
+        if abs(det) > 1e-9 * ref_norm * curr_norm:
+            return False
     return True
 
 
@@ -338,63 +336,7 @@ def plot_dcn(
                 return center
             return (center[0] + dx/dist * r, center[1] + dy/dist * r)
 
-        # Check separability along each qubit
-        # qubit_idx: 2=Q1/MSB, 1=Q2, 0=Q3/LSB
-        separable_q1 = is_separable_along_qubit(state_vector, 3, qubit_idx=2)
-        separable_q2 = is_separable_along_qubit(state_vector, 3, qubit_idx=1)
-        separable_q3 = is_separable_along_qubit(state_vector, 3, qubit_idx=0)
 
-        # Determine which planes to draw (at most 2, ordered by axis Q1,Q2,Q3)
-        sep_axes = [q for q in [1, 2, 3] if [separable_q1, separable_q2, separable_q3][q-1]]
-        ent_axes = [q for q in [1, 2, 3] if not [separable_q1, separable_q2, separable_q3][q-1]]
-
-        if len(sep_axes) == 3:  # Fully separable
-            planes = [(1, 'green', 'sep Q1'), (2, 'green', 'sep Q2')]
-        elif len(sep_axes) == 0:  # Fully entangled
-            planes = [(1, 'red', 'ent Q1'), (2, 'red', 'ent Q2')]
-        else:  # Mixed: 1 sep + 2 ent -> show 1 green + 1 red
-            first_sep = next(q for q in [1, 2, 3] if q in sep_axes)
-            first_ent = next(q for q in [1, 2, 3] if q in ent_axes)
-            planes = [(first_sep, 'green', f'sep Q{first_sep}'),
-                      (first_ent, 'red', f'ent Q{first_ent}')]
-
-        # Helper to generate plane points for each axis
-        def get_plane_pts(axis, m):
-            if axis == 1:  # Q1: vertical plane at x = ax_dim/2
-                x_mid = ax_dim / 2
-                return [(x_mid, -m), (x_mid, ay_dim + m),
-                        (x_mid + sx, ay_dim + sy + m), (x_mid + sx, sy - m)]
-            elif axis == 2:  # Q2: horizontal-ish plane at y = ay_dim/2
-                y_mid = ay_dim / 2
-                return [(-m, y_mid), (ax_dim + m, y_mid),
-                        (ax_dim + sx + m, y_mid + sy), (sx - m, y_mid + sy)]
-            else:  # Q3: diagonal rectangle at offset (sx/2, sy/2)
-                x_off = sx / 2
-                y_off = sy / 2
-                return [(x_off - m, y_off - m), (ax_dim + x_off + m, y_off - m),
-                        (ax_dim + x_off + m, ay_dim + y_off + m),
-                        (x_off - m, ay_dim + y_off + m)]
-
-        # Draw planes in axis order (Q1, Q2, Q3)
-        margin_small = 0.3 * scale
-        for axis, color, label in sorted(planes, key=lambda x: x[0]):
-            pts = get_plane_pts(axis, margin_small)
-            pts.append(pts[0])  # Close polygon
-            px_vals = [p[0] for p in pts]
-            py_vals = [p[1] for p in pts]
-            ax.fill(px_vals, py_vals, color, alpha=0.2, edgecolor=color, linewidth=2)
-            # Position label at center of plane
-            if axis == 1:
-                label_x = ax_dim/2 + sx/2
-                label_y = (ay_dim + sy) / 2
-            elif axis == 2:
-                label_x = (ax_dim + sx) / 2
-                label_y = ay_dim/2 + sy/2
-            else:
-                label_x = sx/2 + ax_dim/2
-                label_y = sy/2 + ay_dim/2
-            ax.text(label_x, label_y, label, ha='center', va='center',
-                   fontsize=7, color=color, fontweight='bold')
 
         # Draw connecting lines between adjacent basis states (circumference to circumference)
         for i_curr, (x_curr, y_curr, q1, q2, q3, _, _) in positions.items():

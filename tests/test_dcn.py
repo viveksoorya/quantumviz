@@ -136,6 +136,12 @@ class TestIsSeparableAlongQubit:
         assert is_separable_along_qubit(state, 2, qubit_idx=0) == True
         assert is_separable_along_qubit(state, 2, qubit_idx=1) == True
 
+    def test_separable_near_zero_ref(self):
+        """Separable state with very small ref component (numerical robustness)."""
+        eps = 1e-8
+        state = [eps, 1, 2*eps, 2]
+        assert is_separable_along_qubit(state, 2, qubit_idx=0) == True
+
 
 class TestPlotDCNFromFile:
     """Tests for plot_dcns_from_file."""

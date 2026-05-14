@@ -389,7 +389,10 @@ def hinton(input_file, output_file, fmt, dpi):
 @click.option("-o", "--output-dir", "output_dir", help="Output directory")
 @click.option("-f", "--format", "fmt", type=click.Choice(["png", "pdf", "svg"], case_sensitive=False), default="png", help="Output format (png, pdf, svg)")
 @click.option("--dpi", default=150, help="DPI for saved figures")
-def qbeads(input_files, output_dir, fmt, dpi):
+@click.option("--variant", "variant", type=click.Choice(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"], case_sensitive=False), default="A", help="BEADS display variant (see Table 4 in paper)")
+@click.option("--color-scheme", "color_scheme", type=click.Choice(["standard", "continuous", "high_contrast", "colorblind", "grayscale"], case_sensitive=False), default="standard", help="Color scheme for beads")
+@click.option("--symmetric-only", "symmetric_only", is_flag=True, help="Only show fully symmetric components (variant H)")
+def qbeads(input_files, output_dir, fmt, dpi, variant, color_scheme, symmetric_only):
     """Plot BEADS (Quantum Beads) visualization from JSON or QPY input file(s).
 
     Supports multiple input files: quantumviz qbeads file1.json file2.json
@@ -398,6 +401,14 @@ def qbeads(input_files, output_dir, fmt, dpi):
     - {"states": [[...], [...]]} - array of state vectors
     - {"state_vector": [...]} - single state vector
     - {"qubits": N, "stages": [...]} - stages format
+
+    Display variants (Table 4):
+    A: Q+T-Beads, separate symmetries (default)
+    B: Q+T-Beads, single color scheme
+    F: Q+E-Beads only (entanglement focus)
+    H: Q+E-Beads, symmetric only (simplified)
+    I: Q-Beads only with arcs (educational)
+    J: Q-Beads only, no arcs (minimal)
     """
     for input_file in input_files:
         if output_dir is None:
@@ -419,14 +430,24 @@ def qbeads(input_files, output_dir, fmt, dpi):
                 qc = circuits[0] if circuits else None
                 sv = Statevector.from_circuit(qc)
                 from quantumviz.qbeads import plot_qbeads
-                plot_qbeads(sv, "BEADS Visualization", output_file, dpi)
+                plot_qbeads(sv, "BEADS Visualization", output_file, dpi,
+                            variant=variant, color_scheme=color_scheme)
             except ImportError:
                 click.echo("Error: Qiskit not installed. Install with: pip install qiskit", err=True)
                 sys.exit(1)
         else:
-            _plot_qbeads(input_file, output_dir, dpi, fmt)
+            _plot_qbeads(input_file, output_dir, dpi, fmt,
+                         variant=variant, color_scheme=color_scheme)
 
         click.echo(f"Saved: {output_file}")
+
+
+def _plot_qbeads(input_file, output_dir=None, dpi=150, fmt="png",
+                 variant="A", color_scheme="standard"):
+    """Helper to plot BEADS from JSON file."""
+    from quantumviz.qbeads import plot_qbeads_from_file
+    plot_qbeads_from_file(input_file, output_dir, dpi, fmt,
+                           variant=variant, color_scheme=color_scheme)
 
 
 @main.command()
