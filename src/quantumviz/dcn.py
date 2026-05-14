@@ -121,7 +121,7 @@ def plot_dcn(
     fig_size = 8 if n_qubits == 3 else 4
     fig, ax = plt.subplots(figsize=(fig_size, fig_size))
 
-    fig.suptitle(title, fontsize=12, y=0.98)
+    fig.suptitle(title, fontsize=12, y=0.95)
 
     # Circle radius (outer circle)
     circle_r = 1.0
@@ -273,7 +273,7 @@ def plot_dcn(
                 y = 0
             else:
                 x = (i >> 1) & 1
-                y = i & 1
+                y = 1 - (i & 1)
 
             if n_qubits == 1:
                 px = 0.6 + x * 2.2
@@ -311,6 +311,24 @@ def plot_dcn(
 
             # Center dot
             ax.plot(px, py, 'ko', markersize=4)
+
+        # Draw entanglement indicator for 2-qubit states
+        if n_qubits == 2:
+            separable_q1 = is_separable_along_qubit(state_vector, 2, qubit_idx=1)
+            separable_q2 = is_separable_along_qubit(state_vector, 2, qubit_idx=0)
+            is_entangled = not (separable_q1 and separable_q2)
+            line_color = 'red' if is_entangled else 'green'
+            label_text = 'ent' if is_entangled else 'sep'
+
+            x_mid = 1.0 + 2.2 / 2
+            y_bottom = 0.5 - circle_r - 0.2
+            y_top = 0.5 + 2.6 + circle_r + 0.2
+            ax.plot([x_mid, x_mid], [y_bottom, y_top], color=line_color,
+                    linewidth=3, alpha=0.6, zorder=2)
+            ax.text(x_mid, (y_bottom + y_top) / 2, label_text, ha='center', va='center',
+                    fontsize=8, color=line_color, fontweight='bold', zorder=3,
+                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
+                              edgecolor='none', alpha=0.8))
 
     # Draw separability plane and connecting lines for 3-qubit case
     if n_qubits == 3:
@@ -430,7 +448,7 @@ def plot_dcn(
 
         if n_qubits > 1:
             ax.plot([x_min, x_min], [y_min, y_max], 'k-', linewidth=1.5)
-            ax.annotate('', xy=(x_min, y_max), xytext=(x_min, y_max - 0.2),
+            ax.annotate('', xy=(x_min, y_min), xytext=(x_min, y_min + 0.2),
                        arrowprops=dict(arrowstyle='->', color='black', lw=1.5))
             ax.text(x_min - 0.5, (y_min + y_max) / 2, '2nd Qubit',
                    ha='center', va='center', fontsize=9, rotation=90)
@@ -438,7 +456,7 @@ def plot_dcn(
             ax.plot([x_min, x_max], [y_max, y_max], 'k-', linewidth=1.5)
             ax.annotate('', xy=(x_max, y_max), xytext=(x_max - 0.2, y_max),
                       arrowprops=dict(arrowstyle='->', color='black', lw=1.5))
-            ax.text((x_min + x_max) / 2, y_max + 0.5, '1st Qubit',
+            ax.text((x_min + x_max) / 2, y_max + 0.3, '1st Qubit',
                    ha='center', va='bottom', fontsize=9)
 
         ax.set_aspect('equal')
